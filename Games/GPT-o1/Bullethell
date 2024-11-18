@@ -1,6 +1,7 @@
 import pygame
 import random
 import sys
+import math
 
 # Initialize Pygame
 pygame.init()
@@ -11,12 +12,13 @@ SCREEN_HEIGHT = 600
 FPS = 60
 
 # Colors
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLACK = (0, 0, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
+WHITE  = (255, 255, 255)
+RED    = (255,   0,   0)
+GREEN  = (  0, 255,   0)
+BLACK  = (  0,   0,   0)
+BLUE   = (  0,   0, 255)
+YELLOW = (255, 255,   0)
+PURPLE = (160,  32, 240)
 
 # Setup Display
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -27,21 +29,21 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 36)
 
 # Sprite Groups
-all_sprites = pygame.sprite.Group()
-enemies = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
-bosses = pygame.sprite.Group()
+all_sprites   = pygame.sprite.Group()
+bullets       = pygame.sprite.Group()
+bosses        = pygame.sprite.Group()
 enemy_bullets = pygame.sprite.Group()
+enemies       = pygame.sprite.Group()  # Added enemies group
 
 # Player Class
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super(Player, self).__init__()
-        self.image = pygame.Surface((30, 20))  # Smaller size
+        self.image = pygame.Surface((30, 20))
         self.image.fill(WHITE)
         self.rect = self.image.get_rect()
         self.rect.centerx = SCREEN_WIDTH / 2
-        self.rect.centery = SCREEN_HEIGHT - 50
+        self.rect.bottom  = SCREEN_HEIGHT - 10
         self.speed = 5
         self.last_shot = pygame.time.get_ticks()
         self.shoot_delay = 250
@@ -49,6 +51,7 @@ class Player(pygame.sprite.Sprite):
 
     def update(self):
         keys = pygame.key.get_pressed()
+        # Movement controls
         if keys[pygame.K_LEFT]:
             self.rect.x -= self.speed
             if self.rect.left < 0:
@@ -65,6 +68,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.y += self.speed
             if self.rect.bottom > SCREEN_HEIGHT:
                 self.rect.bottom = SCREEN_HEIGHT
+        # Shooting
         if keys[pygame.K_SPACE]:
             self.shoot()
 
@@ -72,152 +76,232 @@ class Player(pygame.sprite.Sprite):
         now = pygame.time.get_ticks()
         if now - self.last_shot > self.shoot_delay:
             self.last_shot = now
-            # Shoot two bullets with slight horizontal offsets
             bullet1 = Bullet(self.rect.left + 5, self.rect.top)
             bullet2 = Bullet(self.rect.right - 5, self.rect.top)
             all_sprites.add(bullet1, bullet2)
             bullets.add(bullet1, bullet2)
-            print("Player shot two bullets")
+
+    # Draw the player's hitbox (a point)
+    def draw_hitbox(self, surface):
+        pygame.draw.circle(surface, RED, (self.rect.centerx, self.rect.centery), 3)
 
 # Bullet Class
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super(Bullet, self).__init__()
-        self.image = pygame.Surface((7, 14))  # Increased size for better visibility
+        self.image = pygame.Surface((5, 10))
         self.image.fill(RED)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
-        self.rect.bottom = y
-        self.speed = -12  # Increased speed for responsiveness
-        self.damage = 50  # Increased damage
+        self.rect.bottom  = y
+        self.speed  = -12
+        self.damage = 50
 
     def update(self):
         self.rect.y += self.speed
         if self.rect.bottom < 0:
             self.kill()
 
-# Enemy Class
-class Enemy(pygame.sprite.Sprite):
-    def __init__(self, level):
-        super(Enemy, self).__init__()
-        self.image = pygame.Surface((40, 30))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randint(0, SCREEN_WIDTH - self.rect.width)
-        self.rect.y = -self.rect.height
-        self.speedy = 2 + level
-        self.speedx = random.choice([-1, 1]) * (level * 0.5)
-        self.level = level
-        self.last_shot = pygame.time.get_ticks()
-        self.shoot_delay = max(500 - (level * 50), 200)
-        self.health = 100 + (level * 50)
-
-    def update(self):
-        self.rect.y += self.speedy
-        self.rect.x += self.speedx
-        if self.rect.top > SCREEN_HEIGHT or self.rect.left < -self.rect.width or self.rect.right > SCREEN_WIDTH + self.rect.width:
-            self.kill()
-        self.shoot()
-
-    def shoot(self):
-        now = pygame.time.get_ticks()
-        if now - self.last_shot > self.shoot_delay:
-            self.last_shot = now
-            direction = random.choice(['left', 'straight', 'right'])
-            enemy_bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, direction)
-            all_sprites.add(enemy_bullet)
-            enemy_bullets.add(enemy_bullet)
-            print(f'Enemy at ({self.rect.x}, {self.rect.y}) shot a bullet to the {direction}')
-
-    def draw_health_bar(self, surface):
-        bar_length = self.rect.width
-        bar_height = 5
-        max_health = 100 + (self.level * 50)
-        fill = (self.health / max_health) * bar_length
-        outline_rect = pygame.Rect(self.rect.x, self.rect.y - 10, bar_length, bar_height)
-        fill_rect = pygame.Rect(self.rect.x, self.rect.y - 10, fill, bar_height)
-        pygame.draw.rect(surface, RED, fill_rect)
-        pygame.draw.rect(surface, WHITE, outline_rect, 1)
-
 # Enemy Bullet Class
 class EnemyBullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, direction):
+    def __init__(self, x, y, speedx, speedy):
         super(EnemyBullet, self).__init__()
         self.image = pygame.Surface((5, 10))
         self.image.fill(BLUE)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
-        self.rect.top = y
-        self.speedy = 5
-        self.speedx = 0
-        if direction == 'left':
-            self.speedx = -3
-        elif direction == 'right':
-            self.speedx = 3
+        self.rect.centery = y
+        self.speedx  = speedx
+        self.speedy  = speedy
 
     def update(self):
-        self.rect.y += self.speedy
         self.rect.x += self.speedx
-        if self.rect.top > SCREEN_HEIGHT or self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
+        self.rect.y += self.speedy
+        if (self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0 or
+            self.rect.left > SCREEN_WIDTH or self.rect.right < 0):
             self.kill()
+
+# Enemy Class
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self, entry_side):
+        super(Enemy, self).__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.speed = 3
+        self.last_shot = pygame.time.get_ticks()
+        self.shoot_delay = 2000  # Enemies shoot every 2 seconds
+        # Spawn enemy from different sides
+        if entry_side == 'left':
+            self.rect.x = -self.rect.width
+            self.rect.y = random.randint(0, SCREEN_HEIGHT - self.rect.height)
+            self.speedx = self.speed
+            self.speedy = 0
+        elif entry_side == 'right':
+            self.rect.x = SCREEN_WIDTH
+            self.rect.y = random.randint(0, SCREEN_HEIGHT - self.rect.height)
+            self.speedx = -self.speed
+            self.speedy = 0
+        elif entry_side == 'top':
+            self.rect.x = random.randint(0, SCREEN_WIDTH - self.rect.width)
+            self.rect.y = -self.rect.height
+            self.speedx = 0
+            self.speedy = self.speed
+        elif entry_side == 'bottom':
+            self.rect.x = random.randint(0, SCREEN_WIDTH - self.rect.width)
+            self.rect.y = SCREEN_HEIGHT
+            self.speedx = 0
+            self.speedy = -self.speed
+
+    def update(self):
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+        # Shooting
+        now = pygame.time.get_ticks()
+        if now - self.last_shot > self.shoot_delay:
+            self.last_shot = now
+            self.shoot()
+        # Remove enemy when it goes off-screen
+        if (self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0 or
+            self.rect.left > SCREEN_WIDTH or self.rect.right < 0):
+            self.kill()
+
+    def shoot(self):
+        # Enemies shoot in their moving direction
+        bullet = EnemyBullet(self.rect.centerx, self.rect.centery, self.speedx, self.speedy)
+        all_sprites.add(bullet)
+        enemy_bullets.add(bullet)
 
 # Boss Class
 class Boss(pygame.sprite.Sprite):
-    def __init__(self, level):
+    def __init__(self, level, pattern):
         super(Boss, self).__init__()
         self.image = pygame.Surface((100, 60))
-        self.image.fill(RED)
+        self.image.fill(YELLOW)
         self.rect = self.image.get_rect()
         self.rect.centerx = SCREEN_WIDTH / 2
         self.rect.y = 50
-        self.speed = 2 + level
+        self.speed = 2
         self.direction = 1
-        self.level = level  # Ensure level is set
-        self.health = 300 + (level * 100)
+        self.level = level
+        # Increase health based on level
+        self.health = 1000 + (self.level * 1000)
+        self.max_health = self.health
+        # Decrease shoot_delay based on level
+        self.shoot_delay = max(2000 - (self.level * 300), 500)
         self.last_shot = pygame.time.get_ticks()
-        self.shoot_delay = max(1500 - (level * 200), 800)
+        self.pattern = pattern
+        # For burst shooting
+        self.burst_shots = 0
+        self.burst_count = 3  # Number of bullets in a burst
+        self.burst_delay = 100  # Time between shots in a burst
+        self.burst_cooldown = 1000  # Time between bursts
+        self.last_burst = pygame.time.get_ticks() - self.burst_cooldown
+        # For summoning enemies
+        self.summon_delay = 5000  # Time between summons
+        self.last_summon = pygame.time.get_ticks() - self.summon_delay
 
     def update(self):
+        # Boss movement
         self.rect.x += self.speed * self.direction
         if self.rect.right >= SCREEN_WIDTH or self.rect.left <= 0:
             self.direction *= -1
         self.shoot()
+        self.summon_enemies()
 
     def shoot(self):
         now = pygame.time.get_ticks()
-        if now - self.last_shot > self.shoot_delay:
-            self.last_shot = now
-            directions = ['left', 'straight', 'right']
-            for direction in directions:
-                bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, direction)
-                all_sprites.add(bullet)
-                enemy_bullets.add(bullet)
-                print(f'Boss shot a bullet to the {direction}')
+        if self.pattern == 'aimed':
+            if now - self.last_burst > self.burst_cooldown:
+                self.last_burst = now
+                self.burst_shots = 0
+
+            if self.burst_shots < self.burst_count:
+                if now - self.last_shot > self.burst_delay:
+                    self.last_shot = now
+                    self.burst_shots +=1
+                    # Shoot directly at the player
+                    dx = player.rect.centerx - self.rect.centerx
+                    dy = player.rect.centery - self.rect.centery
+                    dist = math.hypot(dx, dy)
+                    speed = 5 + self.level
+                    vx = (dx / dist) * speed
+                    vy = (dy / dist) * speed
+                    bullet = EnemyBullet(self.rect.centerx, self.rect.centery, vx, vy)
+                    all_sprites.add(bullet)
+                    enemy_bullets.add(bullet)
+        else:
+            # Existing patterns (random, circle, spiral)
+            if now - self.last_shot > self.shoot_delay:
+                self.last_shot = now
+                if self.pattern == 'random':
+                    # Shoot bullets at random angles
+                    num_bullets = 5 + self.level
+                    for _ in range(num_bullets):
+                        angle = random.uniform(0, 2 * math.pi)
+                        speed = 4 + self.level
+                        vx = math.cos(angle) * speed
+                        vy = math.sin(angle) * speed
+                        bullet = EnemyBullet(self.rect.centerx, self.rect.centery, vx, vy)
+                        all_sprites.add(bullet)
+                        enemy_bullets.add(bullet)
+                elif self.pattern == 'circle':
+                    # Shoot bullets in a circular pattern
+                    num_bullets = 12 + (self.level * 2)
+                    for i in range(num_bullets):
+                        angle = (2 * math.pi / num_bullets) * i
+                        speed = 3 + self.level
+                        vx = math.cos(angle) * speed
+                        vy = math.sin(angle) * speed
+                        bullet = EnemyBullet(self.rect.centerx, self.rect.centery, vx, vy)
+                        all_sprites.add(bullet)
+                        enemy_bullets.add(bullet)
+                elif self.pattern == 'spiral':
+                    # Shoot bullets in a spiral pattern
+                    num_bullets = 20
+                    angle_offset = (now % 360) * (math.pi / 180)
+                    for i in range(num_bullets):
+                        angle = (2 * math.pi / num_bullets) * i + angle_offset
+                        speed = 2 + self.level
+                        vx = math.cos(angle) * speed
+                        vy = math.sin(angle) * speed
+                        bullet = EnemyBullet(self.rect.centerx, self.rect.centery, vx, vy)
+                        all_sprites.add(bullet)
+                        enemy_bullets.add(bullet)
+
+    def summon_enemies(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_summon > self.summon_delay:
+            self.last_summon = now
+            # Summon enemies from random sides
+            entry_side = random.choice(['left', 'right', 'top', 'bottom'])
+            enemy = Enemy(entry_side)
+            all_sprites.add(enemy)
+            enemies.add(enemy)
 
     def draw_health_bar(self, surface):
         bar_length = self.rect.width
         bar_height = 5
-        max_health = 300 + (self.level * 100)
-        fill = (self.health / max_health) * bar_length
+        fill = (self.health / self.max_health) * bar_length
         outline_rect = pygame.Rect(self.rect.x, self.rect.y - 10, bar_length, bar_height)
-        fill_rect = pygame.Rect(self.rect.x, self.rect.y - 10, fill, bar_height)
-        pygame.draw.rect(surface, YELLOW, fill_rect)
+        fill_rect    = pygame.Rect(self.rect.x, self.rect.y - 10, fill, bar_height)
+        pygame.draw.rect(surface, RED, fill_rect)
         pygame.draw.rect(surface, WHITE, outline_rect, 1)
 
 # Function to Reset the Game
 def reset_game():
-    global all_sprites, enemies, bullets, bosses, enemy_bullets, player, level, boss_spawned, game_over
+    global all_sprites, bullets, bosses, enemy_bullets, enemies
+    global player, level, boss_spawned, game_over
     all_sprites.empty()
-    enemies.empty()
     bullets.empty()
     bosses.empty()
     enemy_bullets.empty()
+    enemies.empty()
     player = Player()
     all_sprites.add(player)
     level = 1
     boss_spawned = False
     game_over = False
-    print("Game has been reset")
 
 # Create Player
 player = Player()
@@ -226,13 +310,16 @@ all_sprites.add(player)
 # Game Variables
 level = 1
 max_levels = 4
-enemy_spawn_time = 1000  # milliseconds
 boss_spawned = False
 game_over = False
 
-# Timer for Enemy Spawning
-enemy_event = pygame.USEREVENT + 1
-pygame.time.set_timer(enemy_event, enemy_spawn_time)
+# Boss Patterns per Level
+boss_patterns = {
+    1: 'aimed',
+    2: 'random',
+    3: 'circle',
+    4: 'spiral'
+}
 
 # Main Game Loop
 running = True
@@ -242,11 +329,6 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == enemy_event and not boss_spawned and not game_over:
-            enemy = Enemy(level)
-            all_sprites.add(enemy)
-            enemies.add(enemy)
-            print(f'Enemy spawned at ({enemy.rect.x}, {enemy.rect.y})')
         elif event.type == pygame.KEYDOWN and game_over:
             if event.key == pygame.K_r:
                 reset_game()
@@ -255,62 +337,51 @@ while running:
         # Update all sprites
         all_sprites.update()
 
-        # Check for bullet-enemy collisions
-        hits_enemies = pygame.sprite.groupcollide(enemies, bullets, False, True)
-        print(f'Number of enemies hit this frame: {len(hits_enemies)}')
-        for enemy, bullet_group in hits_enemies.items():
-            for bullet in bullet_group:
-                enemy.health -= bullet.damage
-                print(f'Enemy hit! Remaining Health: {enemy.health}')
-                if enemy.health <= 0:
-                    enemy.kill()
-                    print("Enemy killed")
-                    level += 1
-                    boss_spawned = False
-                    if level > max_levels:
-                        game_over = True
-                        print("Reached max levels. Game Over.")
-
-        # Check for bullet-boss collisions
+        # Collision detection between bullets and bosses
         hits_bosses = pygame.sprite.groupcollide(bosses, bullets, False, True)
-        print(f'Number of bosses hit this frame: {len(hits_bosses)}')
         for boss, bullet_group in hits_bosses.items():
             for bullet in bullet_group:
                 boss.health -= bullet.damage
-                print(f'Boss hit! Remaining Health: {boss.health}')
                 if boss.health <= 0:
                     boss.kill()
-                    print("Boss defeated")
                     level += 1
                     boss_spawned = False
                     if level > max_levels:
                         game_over = True
-                        print("Reached max levels. Game Over.")
 
-        # Check for enemy bullet collisions with player
-        hits = pygame.sprite.spritecollide(player, enemy_bullets, True)
+        # Collision detection between enemy bullets and player
+        hits = pygame.sprite.spritecollide(player, enemy_bullets, True, collided=lambda x, y: y.rect.collidepoint(player.rect.center))
         for hit in hits:
             player.lives -= 1
-            print(f'Player hit! Remaining Lives: {player.lives}')
             if player.lives <= 0:
                 game_over = True
-                print("Player has died. Game Over.")
 
-        # Check if all enemies are defeated to spawn boss
-        if not enemies and not boss_spawned and not game_over:
-            boss = Boss(level)
+        # Collision detection between enemies and player
+        hits_enemies = pygame.sprite.spritecollide(player, enemies, True, collided=lambda x, y: y.rect.collidepoint(player.rect.center))
+        for hit in hits_enemies:
+            player.lives -= 1
+            if player.lives <= 0:
+                game_over = True
+
+        # Collision detection between player's bullets and enemies
+        hits_enemy = pygame.sprite.groupcollide(enemies, bullets, True, True)
+
+        # Spawn boss if not present
+        if not bosses and not boss_spawned and not game_over:
+            pattern = boss_patterns.get(level, 'aimed')  # Default to 'aimed' if level not defined
+            boss = Boss(level, pattern)
             all_sprites.add(boss)
             bosses.add(boss)
             boss_spawned = True
-            print("Boss spawned")
 
     # Draw everything
     screen.fill(BLACK)
     all_sprites.draw(screen)
 
-    # Draw Health Bars for Enemies and Bosses
-    for enemy in enemies:
-        enemy.draw_health_bar(screen)
+    # Draw player's hitbox
+    player.draw_hitbox(screen)
+
+    # Draw Health Bars
     for boss in bosses:
         boss.draw_health_bar(screen)
 
