@@ -3,6 +3,24 @@ import random
 import sys
 import math
 import os
+import shutil
+
+# Get the directory of the current Python file
+current_dir = os.path.dirname(os.path.realpath(__file__))
+
+# Define assets directory path inside GPT-o1 folder
+ASSETS_DIR = os.path.join(current_dir, 'assets')
+
+# Create assets directory if it doesn't exist
+os.makedirs(ASSETS_DIR, exist_ok=True)
+
+# Define directories using ASSETS_DIR
+sprites_dir = os.path.join(ASSETS_DIR, 'sprites')
+backgrounds_dir = os.path.join(ASSETS_DIR, 'backgrounds')
+
+# Create directories if they don't exist
+os.makedirs(sprites_dir, exist_ok=True)
+os.makedirs(backgrounds_dir, exist_ok=True)
 
 # Initialize Pygame
 pygame.init()
@@ -24,18 +42,16 @@ YELLOW = (255, 255,   0)
 ORANGE = (255, 165,    0)
 PURPLE = (128,   0, 128)
 
-# Define directories
-sprites_dir = os.path.join('assets', 'sprites')
-backgrounds_dir = os.path.join('assets', 'backgrounds')
-
-# Create directories if they don't exist
-os.makedirs(sprites_dir, exist_ok=True)
-os.makedirs(backgrounds_dir, exist_ok=True)
-
 # Helper function to save images
 def save_image(surface, path):
     pygame.image.save(surface, path)
     print(f"Saved {path}")
+
+# Helper function to clean assets directory
+def clean_assets():
+    if os.path.exists(ASSETS_DIR):
+        shutil.rmtree(ASSETS_DIR)
+    os.makedirs(ASSETS_DIR, exist_ok=True)
 
 # Create Player Image
 player_path = os.path.join(sprites_dir, 'player.png')
@@ -110,14 +126,14 @@ font = pygame.font.SysFont(None, 36)
 backgrounds = {}
 for level in range(1, 11):
     try:
-        backgrounds[level] = pygame.image.load(os.path.join('assets', 'backgrounds', f'background_level_{level}.png')).convert()
+        backgrounds[level] = pygame.image.load(os.path.join(ASSETS_DIR, 'backgrounds', f'background_level_{level}.png')).convert()
         backgrounds[level] = pygame.transform.scale(backgrounds[level], (SCREEN_WIDTH, SCREEN_HEIGHT))
     except:
         backgrounds[level] = BLACK  # Fallback to black if image not found
 
 # Load Player Image
 try:
-    player_image = pygame.image.load(os.path.join('assets', 'sprites', 'player.png')).convert_alpha()
+    player_image = pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'player.png')).convert_alpha()
     player_image = pygame.transform.scale(player_image, (30, 30))
 except:
     player_image = pygame.Surface((30, 30), pygame.SRCALPHA)
@@ -125,21 +141,21 @@ except:
 
 # Load Enemy Images based on pattern
 enemy_images = {
-    'aimed': pygame.image.load(os.path.join('assets', 'sprites', 'enemy_aimed.png')).convert_alpha(),
-    'random': pygame.image.load(os.path.join('assets', 'sprites', 'enemy_random.png')).convert_alpha(),
-    'circle': pygame.image.load(os.path.join('assets', 'sprites', 'enemy_circle.png')).convert_alpha()
+    'aimed': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'enemy_aimed.png')).convert_alpha(),
+    'random': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'enemy_random.png')).convert_alpha(),
+    'circle': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'enemy_circle.png')).convert_alpha()
 }
 for key in enemy_images:
     enemy_images[key] = pygame.transform.scale(enemy_images[key], (30, 30))
 
 # Load Boss Images
 boss_images = {
-    'burst_homing': pygame.image.load(os.path.join('assets', 'sprites', 'boss_burst_homing.png')).convert_alpha(),
-    'spiral': pygame.image.load(os.path.join('assets', 'sprites', 'boss_spiral.png')).convert_alpha(),
-    'circle': pygame.image.load(os.path.join('assets', 'sprites', 'boss_circle.png')).convert_alpha(),
-    'aimed': pygame.image.load(os.path.join('assets', 'sprites', 'boss_aimed.png')).convert_alpha(),
-    'random': pygame.image.load(os.path.join('assets', 'sprites', 'boss_random.png')).convert_alpha(),
-    'mass_acceleration': pygame.image.load(os.path.join('assets', 'sprites', 'boss_mass_acceleration.png')).convert_alpha()
+    'burst_homing': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_burst_homing.png')).convert_alpha(),
+    'spiral': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_spiral.png')).convert_alpha(),
+    'circle': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_circle.png')).convert_alpha(),
+    'aimed': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_aimed.png')).convert_alpha(),
+    'random': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_random.png')).convert_alpha(),
+    'mass_acceleration': pygame.image.load(os.path.join(ASSETS_DIR, 'sprites', 'boss_mass_acceleration.png')).convert_alpha()
 }
 for key in boss_images:
     boss_images[key] = pygame.transform.scale(boss_images[key], (100, 80))
@@ -208,18 +224,19 @@ class Player(pygame.sprite.Sprite):
         
         # Check if SHIFT key is held down to decrease speed
         if key_state[pygame.K_LSHIFT] or key_state[pygame.K_RSHIFT]:
-            move_speed = self.base_speed / 2  # Reduce speed by half
+            self.base_speed = 2  # Example reduced speed
         else:
-            move_speed = self.base_speed
+            self.base_speed = 5  # Reset to base speed
         
         if key_state[pygame.K_LEFT]:
-            self.speedx = -move_speed
+            self.speedx = -self.base_speed
         if key_state[pygame.K_RIGHT]:
-            self.speedx = move_speed
+            self.speedx = self.base_speed
         if key_state[pygame.K_UP]:
-            self.speedy = -move_speed
+            self.speedy = -self.base_speed
         if key_state[pygame.K_DOWN]:
-            self.speedy = move_speed
+            self.speedy = self.base_speed
+        
         self.rect.x += self.speedx
         self.rect.y += self.speedy
 
@@ -234,45 +251,20 @@ class Player(pygame.sprite.Sprite):
             self.rect.bottom = SCREEN_HEIGHT
 
         # Shooting
-        if key_state[pygame.K_SPACE]:
+        if key_state[pygame.K_z]:
             self.shoot()
 
     def shoot(self):
         now = pygame.time.get_ticks()
         if now - getattr(self, 'last_shot', 0) > 250:
             self.last_shot = now
-            # Fire bullets based on power level
-            if self.power_level >= 5:
-                # Max power level - 5 bullets with tilts
-                angles = [-15, -7.5, 0, 7.5, 15]
-            elif self.power_level >= 4:
-                # Power level 4 - 4 bullets with tilts
-                angles = [-10, -5, 5, 10]
-            elif self.power_level >= 3:
-                # Power level 3 - 3 bullets with slight tilts
-                angles = [-5, 0, 5]
-            elif self.power_level >= 1:
-                # Power levels 1 and 2 - 2 bullets with slight tilt
-                angles = [-2.5, 2.5]
-            else:
-                # Power level 0 - single bullet
-                angles = [0]
-
-            for angle in angles:
-                # Convert angle to radians
-                rad = math.radians(angle)
-                # Calculate bullet velocity
-                bullet_speed = -12
-                speedx = bullet_speed * math.sin(rad)
-                speedy = bullet_speed * math.cos(rad)
-                bullet = Bullet(self.rect.centerx, self.rect.top, self.power_level, speedx, speedy)
-                all_sprites.add(bullet)
-                bullets.add(bullet)
+            bullet = Bullet(self.rect.centerx, self.rect.top, self.power_level)
+            all_sprites.add(bullet)
+            bullets.add(bullet)
 
     def power_up(self):
         if self.power_level < 5:
             self.power_level += 1
-            self.pp_collected = 0
 
 # Bullet Class
 class Bullet(pygame.sprite.Sprite):
@@ -832,6 +824,9 @@ while running:
             display_game_won()
         else:
             display_game_over()
+
+# Clean up assets before exiting
+clean_assets()
 
 pygame.quit()
 sys.exit()
