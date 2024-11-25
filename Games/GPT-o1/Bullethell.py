@@ -169,7 +169,7 @@ enemies       = pygame.sprite.Group()
 power_points  = pygame.sprite.Group()
 
 # Game Variables
-level = 1
+level = 10
 max_levels = 10
 boss_spawned = False
 boss_active = False
@@ -210,10 +210,10 @@ class Player(pygame.sprite.Sprite):
         self.speedx = 0
         self.speedy = 0
         self.base_speed = 5  # Base movement speed
-        self.lives = 9999
+        self.lives = 300000
 
         # Power-up variables
-        self.power_level = 0  # Ranges from 0 to 5
+        self.power_level = 10  # Ranges from 0 to 10
         self.pp_collected = 0
         self.pp_needed = 5  # Number of pp needed for next power-up
 
@@ -258,13 +258,71 @@ class Player(pygame.sprite.Sprite):
         now = pygame.time.get_ticks()
         if now - getattr(self, 'last_shot', 0) > 250:
             self.last_shot = now
-            bullet = Bullet(self.rect.centerx, self.rect.top, self.power_level)
-            all_sprites.add(bullet)
-            bullets.add(bullet)
+
+            angles = []
+            positions = []
+
+            if self.power_level == 1:
+                # Power level 1: one bullet straight up
+                angles.append(0)
+                positions.append(self.rect.centerx)
+            elif self.power_level == 2:
+                # Power level 2: two bullets straight up, offset positions
+                angles.extend([0, 0])
+                offset = 5  # pixels to offset from center
+                positions.extend([self.rect.centerx - offset, self.rect.centerx + offset])
+            else:
+                if self.power_level % 2 == 0:
+                    # Even power levels: two bullets straight up
+                    angles.extend([0, 0])
+                    positions.extend([self.rect.centerx - 5, self.rect.centerx + 5])
+                    bullets_remaining = self.power_level - 2
+                else:
+                    # Odd power levels: one bullet straight up
+                    angles.append(0)
+                    positions.append(self.rect.centerx)
+                    bullets_remaining = self.power_level - 1
+
+                # Distribute remaining bullets symmetrically around 0 degrees
+                if bullets_remaining > 0:
+                    num_pairs = bullets_remaining // 2
+                    spread_angle = 45  # Total spread angle to one side
+
+                    for i in range(1, num_pairs + 1):
+                        offset_angle = (spread_angle / (num_pairs + 1)) * i
+                        angles.append(-offset_angle)
+                        positions.append(self.rect.centerx)
+                        angles.append(offset_angle)
+                        positions.append(self.rect.centerx)
+
+            # Create bullets based on calculated angles and positions
+            for i, angle in enumerate(angles):
+                radians = math.radians(angle)
+                speed = 12  # Bullet speed
+
+                # Calculate velocity components
+                speedx = speed * math.sin(radians)
+                speedy = -speed * math.cos(radians)
+
+                # Use the offset positions
+                x = positions[i]
+
+                bullet = Bullet(
+                    x,
+                    self.rect.top,
+                    self.power_level,
+                    speedx=speedx,
+                    speedy=speedy
+                )
+                all_sprites.add(bullet)
+                bullets.add(bullet)
 
     def power_up(self):
-        if self.power_level < 5:
+        if self.power_level < 10:
             self.power_level += 1
+            self.pp_collected = 0
+            # Increase pp_needed for next level
+            self.pp_needed += 5  # Each level requires 5 more pp than the previous
 
 # Bullet Class
 class Bullet(pygame.sprite.Sprite):
@@ -274,7 +332,7 @@ class Bullet(pygame.sprite.Sprite):
         self.image.fill(RED)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
-        self.rect.bottom  = y
+        self.rect.bottom = y
         self.speedx = speedx
         self.speedy = speedy
         # Increase damage with power level
@@ -766,7 +824,7 @@ while running:
                 game_over = True
 
         # Power-ups collected by player
-        pp_hits = pygame.sprite.spritecollide(player, power_points, True, pygame.sprite.collide_rect)
+        pp_hits = pygame.sprite.spritecollide(player, power_points, True)
         for pp in pp_hits:
             player.pp_collected += 1
             if player.pp_collected >= player.pp_needed:
@@ -774,22 +832,18 @@ while running:
 
         # Level completion logic
         if level_complete:
-            # Bullets and enemies are already cleared in boss die() method
-            # Clear any remaining power-ups
-            for pp in power_points:
-                pp.kill()
-            display_level_completion(level)
-            level += 1
-            if level > max_levels:
-                game_over = True
+            if level >= max_levels:
                 game_won = True
             else:
+                level += 1
                 level_complete = False
                 boss_spawned = False
                 boss_active = False
                 wave_number = 0
-                wave_start_time = now
-                level_start_time = now
+                waves_per_level = 3 + (level // 2)
+                level_start_time = pygame.time.get_ticks()
+                # Display level completion message
+                display_level_completion(level - 1)
 
         # Drawing
         if isinstance(backgrounds.get(level, BLACK), pygame.Surface):
