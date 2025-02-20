@@ -1,0 +1,12 @@
+{
+    "python.languageServer": "Pylance",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none",
+        "reportShadowedImports": "none"
+    },
+    "circuitpython.board.version": null,
+    "files.associations": {
+        "*.ino": "arduino-output",
+        "stdio.h": "c"
+    }
+}

@@ -1,0 +1,48 @@
+.grid-container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    border: 1px solid black;
+}
+
+.grid-cell {
+    flex: 0 0 25%;
+    box-sizing: border-box;
+    border: 1px solid black;
+}
+
+.nested-grid {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.nested-cell {
+    flex: 0 0 25%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    padding: 10px;
+    text-align: center;
+}
+
+/* Media query for screens less than 720px */
+@media screen and (max-width: 720px) {
+    .grid-cell {
+        flex: 0 0 50%;
+    }
+    
+    .nested-cell {
+        flex: 0 0 50%;
+    }
+}
+
+/* Media query for screens less than 360px */
+@media screen and (max-width: 360px) {
+    .grid-cell {
+        flex: 0 0 100%;
+    }
+    
+    .nested-cell {
+        flex: 0 0 100%;
+    }
+}
