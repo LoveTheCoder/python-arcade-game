@@ -3,6 +3,7 @@ import pygame
 import random
 import numpy as np
 import json
+import math
 
 running = True
 
@@ -27,8 +28,10 @@ def default_config():
     }
 
 # Constants
-WIDTH, HEIGHT = 400, 800
-HIT_POSITION = HEIGHT - 100
+WIDTH, HEIGHT = 800, 480  # New dimensions
+PLAY_WIDTH = 400  # Width of gameplay area
+HIT_POSITION = HEIGHT - 100  # Adjust hit line position
+PLAY_AREA_LEFT = (WIDTH - PLAY_WIDTH) // 2  # Center play area
 SPAWN_INTERVAL = 1000  # Spawn new note every 2 seconds
 
 STATE_RESULTS = 3  # New game state for results screen
@@ -286,12 +289,10 @@ STATE_PAUSE = 2
 # [Previous imports remain the same]
 
 # Modified Constants
-WIDTH, HEIGHT = 400, 800
+WIDTH, HEIGHT = 800, 480
 HIT_POSITION = HEIGHT - 100
 MIN_SCROLL_SPEED = 2
 MAX_SCROLL_SPEED = 10
-
-MUSIC_START_DELAY = 2000  # 2 seconds
 
 class Note(pygame.sprite.Sprite):
     def __init__(self, column, speed, target_time):
@@ -299,23 +300,21 @@ class Note(pygame.sprite.Sprite):
         self.image = pygame.Surface((90, 20))
         self.image.fill(GRAY)
         self.rect = self.image.get_rect()
-        self.rect.x = column * 100
-        self.rect.y = 0  # Start at top of screen
+        self.rect.x = PLAY_AREA_LEFT + (column * 100)
+        self.rect.y = 0
         self.column = column
-        self.speed = speed * 2
+        self.speed = speed
         self.target_time = target_time
-        self.spawn_time = target_time - (APPROACH_TIME * 1000)
+        self.spawn_time = target_time - ((HIT_POSITION / (speed * 100)) * 1000)
         self.hit_status = None
         
     def update(self, current_time):
         time_since_spawn = current_time - self.spawn_time
         if time_since_spawn >= 0:
-            # Calculate position based on time and speed
-            progress = time_since_spawn / (APPROACH_TIME * 1000)
-            self.rect.y = progress * HIT_POSITION
+            self.rect.y = (time_since_spawn / 1000.0) * (self.speed * 100)
             if self.rect.top > HEIGHT and not self.hit_status:
                 self.hit_status = "MISS"
-                return "MISS"
+                return "MISS"  # Let the game state handle scoring
         return None
 
 def generate_note_map(melody, song, difficulty):
@@ -376,18 +375,20 @@ class ScoreTracker:
         if hit_type == "PERFECT":
             base_score = PERFECT_SCORE
             self.perfect_hits += 1
+            self.score += base_score * combo
         elif hit_type == "GREAT":
             base_score = GREAT_SCORE
             self.great_hits += 1
+            self.score += base_score * combo
         elif hit_type == "GOOD":
             base_score = GOOD_SCORE
             self.good_hits += 1
+            self.score += base_score * combo
         else:  # MISS
             self.misses += 1
-            return
+            # No score added for misses
             
-        self.score += base_score * combo
-        self.total_notes += 1
+        self.total_notes += 1  # Always increment total_notes, even for misses
         
     def reset(self):
         self.score = 0
@@ -427,7 +428,7 @@ class GameState:
         self.scroll_speed = 5
         self.selected_song_index = 0
         self.selected_menu_item = 0  # 0=song, 1=difficulty, 2=speed
-        self.pause_options = ["Resume", "Restart", "Exit to Menu"]
+        self.pause_options = ["Restart", "Exit to Menu"]  # Remove Resume option
         self.selected_pause_option = 0
         self.music_position = 0  # Track music position for pausing
         self.music_start_timer = 0  # Track when to start music
@@ -466,33 +467,58 @@ def update(game_state, notes, waiting_notes, scroll_speed, score_tracker, curren
 
 def render(screen, game_state, notes, score_tracker, menu_font):
     """Renders game graphics"""
-    screen.fill((0, 0, 0))
+    # Draw background
+    background = create_background()
+    screen.blit(background, (0, 0))
+    
+    # Draw gameplay area with neon border
+    pygame.draw.rect(screen, (0, 0, 0), 
+                    (PLAY_AREA_LEFT-2, 0, PLAY_WIDTH+4, HEIGHT))
+    pygame.draw.rect(screen, VAPORWAVE_PINK,
+                    (PLAY_AREA_LEFT-2, 0, PLAY_WIDTH+4, HEIGHT), 2)
     
     if game_state.current_state == STATE_PLAY:
-        # Draw gameplay elements
+        # Draw column lines with glow effect
+        for i in range(5):
+            x = PLAY_AREA_LEFT + i * 100
+            pygame.draw.line(screen, VAPORWAVE_BLUE, 
+                           (x, 0), (x, HEIGHT), 1)
+        
+        # Draw hit line with glow
+        pygame.draw.line(screen, VAPORWAVE_PINK,
+                        (PLAY_AREA_LEFT, HIT_POSITION-1),
+                        (PLAY_AREA_LEFT + PLAY_WIDTH, HIT_POSITION-1), 4)
+        pygame.draw.line(screen, WHITE,
+                        (PLAY_AREA_LEFT, HIT_POSITION),
+                        (PLAY_AREA_LEFT + PLAY_WIDTH, HIT_POSITION), 2)
+        
+        # Draw notes with neon effect
         if notes:
-            notes.draw(screen)
+            for note in notes:
+                pygame.draw.rect(screen, VAPORWAVE_BLUE, 
+                               note.rect.inflate(4, 4))
+                pygame.draw.rect(screen, WHITE,
+                               note.rect)
         
-        # Draw hit line
-        pygame.draw.line(screen, WHITE, (0, HIT_POSITION), (WIDTH, HIT_POSITION), 2)
-        
-        # Draw score at top left
-        score_text = menu_font.render(f"Score: {score_tracker.score}", True, WHITE)
+        # Draw UI elements with vaporwave style
+        score_text = menu_font.render(f"Score: {score_tracker.score}", 
+                                    True, VAPORWAVE_PINK)
         screen.blit(score_text, (10, 10))
         
-        # Draw combo in center
         if score_tracker.combo > 0:
-            combo_text = menu_font.render(str(score_tracker.combo), True, WHITE)
-            combo_pos = (WIDTH//2 - combo_text.get_width()//2, HEIGHT//2 - 50)
+            combo_text = menu_font.render(str(score_tracker.combo), 
+                                        True, VAPORWAVE_BLUE)
+            combo_pos = (WIDTH//2 - combo_text.get_width()//2, 
+                        HEIGHT//2 - 50)
             screen.blit(combo_text, combo_pos)
         
-        # Calculate and show accuracy percentage
+        # Draw accuracy at top right
         if score_tracker.total_notes > 0:
             accuracy = ((score_tracker.perfect_hits * 100 + 
-                        score_tracker.great_hits * 75 + 
-                        score_tracker.good_hits * 50) / 
-                       (score_tracker.total_notes * 100)) * 100
-            acc_text = menu_font.render(f"{accuracy:.1f}%", True, WHITE)
+                      score_tracker.great_hits * 75 + 
+                      score_tracker.good_hits * 50) / 
+                      (score_tracker.total_notes * 100)) * 100
+            acc_text = menu_font.render(f"{accuracy:.1f}%", True, VAPORWAVE_BLUE)
             screen.blit(acc_text, (WIDTH - acc_text.get_width() - 10, 10))
 
 def handle_menu_input(event, game_state):
@@ -513,6 +539,10 @@ def handle_menu_input(event, game_state):
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
     elif event.key == pygame.K_TAB:
         game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 3
+        
+def calculate_music_delay(scroll_speed):
+    """Calculate delay based on scroll speed - slower speed needs more delay"""
+    return int(2500 * (5.0 / scroll_speed))  # 2.5 seconds at speed 5, scales inversely
 
 # First, create a helper function to handle song start (add this before main()):
 def start_song(game_state):
@@ -524,8 +554,12 @@ def start_song(game_state):
         game_state.current_song,
         game_state.difficulties[game_state.selected_difficulty]
     )[0]
-    game_state.game_start_time = pygame.time.get_ticks() + MUSIC_START_DELAY
-    game_state.music_start_timer = pygame.time.get_ticks() + MUSIC_START_DELAY
+    
+    # Calculate delay based on current scroll speed
+    music_delay = calculate_music_delay(game_state.scroll_speed)
+    
+    game_state.game_start_time = pygame.time.get_ticks() + music_delay
+    game_state.music_start_timer = pygame.time.get_ticks() + music_delay
     game_state.current_state = STATE_PLAY
 
 def main():
@@ -561,25 +595,20 @@ def main():
                 elif game_state.current_state == STATE_PLAY:
                     if event.key == pygame.K_ESCAPE:
                         game_state.current_state = STATE_PAUSE
-                        game_state.music.stop()  # Use Sound object methods
+                        game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
+                        game_state.music.stop()
                     elif event.key in KEY_MAP:
                         handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
                 
                 elif game_state.current_state == STATE_PAUSE:
-                    if event.key == pygame.K_ESCAPE:
-                        game_state.current_state = STATE_PLAY
-                        game_state.music.play(start=game_state.music_position/1000.0)  # Resume from saved position
-                    elif event.key == pygame.K_UP:
+                    if event.key == pygame.K_UP:
                         game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
                     elif event.key == pygame.K_DOWN:
                         game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
                     elif event.key == pygame.K_RETURN:
-                        if game_state.selected_pause_option == 0:  # Resume
-                            game_state.current_state = STATE_PLAY
-                            game_state.music.play(start=game_state.music_position/1000.0)
-                        elif game_state.selected_pause_option == 1:  # Restart
+                        if game_state.selected_pause_option == 0:  # Restart
                             start_song(game_state)
-                        elif game_state.selected_pause_option == 2:  # Exit to Menu
+                        elif game_state.selected_pause_option == 1:  # Exit to Menu
                             game_state.current_state = STATE_MENU
                             game_state.notes.empty()
                             game_state.score_tracker.reset()
@@ -606,6 +635,7 @@ def main():
                 if result == "MISS":
                     game_state.score_tracker.combo = 0
                     game_state.score_tracker.misses += 1
+                    game_state.score_tracker.add_hit("MISS", 0)  # Add the miss to score tracking
                     note.kill()
             
             # Check for song completion
@@ -619,20 +649,9 @@ def main():
         elif game_state.current_state == STATE_RESULTS:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    if game_state.selected_pause_option == 0:  # Replay
-                        game_state.notes.empty()
-                        game_state.score_tracker.reset()
-                        game_state.waiting_notes = generate_note_map(
-                            game_state.current_song.melody_func(),
-                            game_state.current_song,
-                            game_state.difficulties[game_state.selected_difficulty]
-                        )[0]
-                        game_state.game_start_time = pygame.time.get_ticks() + MUSIC_START_DELAY
-                        game_state.music_start_timer = pygame.time.get_ticks() + MUSIC_START_DELAY
-                        game_state.current_state = STATE_PLAY
-                    else:  # Back to menu
-                        game_state.current_state = STATE_MENU
-                        game_state.song_finished = False
+                    # Always return to menu
+                    game_state.current_state = STATE_MENU
+                    game_state.song_finished = False
 
         # Render current state
         screen.fill((0, 0, 0))
@@ -640,7 +659,7 @@ def main():
         if game_state.current_state == STATE_MENU:
             draw_menu(screen, menu_font, game_state.difficulties, 
                      game_state.selected_difficulty, game_state.scroll_speed, 
-                     game_state.selected_song_index)
+                     game_state.selected_song_index, game_state.selected_menu_item)
         
         elif game_state.current_state == STATE_PLAY:
             render(screen, game_state, game_state.notes, game_state.score_tracker, menu_font)
@@ -657,47 +676,74 @@ def main():
 
     pygame.quit()
 
-def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index):
+def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index, selected_menu_item):
     """Draw the main menu screen"""
-    # Title
-    title = font.render("Rhythm Game", True, WHITE)
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 100))
+    # Draw background
+    background = create_background()
+    screen.blit(background, (0, 0))
     
-    # Song selection
+    # Title with neon effect
+    title = font.render("RHYTHM GAME", True, VAPORWAVE_PINK)
+    title_shadow = font.render("RHYTHM GAME", True, VAPORWAVE_BLUE)
+    screen.blit(title_shadow, (WIDTH//2 - title.get_width()//2 + 2, 92))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 90))
+    
+    # Song selection with background highlight
     for i, song in enumerate(SONGS):
+        if i == selected_song_index and selected_menu_item == 0:
+            pygame.draw.rect(screen, (40, 40, 80), (WIDTH//4, 180 + i*35, WIDTH//2, 30))
+        prefix = "> " if (i == selected_song_index and selected_menu_item == 0) else "  "
         color = WHITE if i == selected_song_index else GRAY
-        text = font.render(song.name, True, color)
-        screen.blit(text, (WIDTH//2 - text.get_width()//2, 200 + i*40))
+        text = font.render(prefix + song.name, True, color)
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, 185 + i*35))
+    
+    # Settings section
+    pygame.draw.rect(screen, (30, 30, 60), (WIDTH//4, 300, WIDTH//2, 100))
     
     # Difficulty
-    diff_text = font.render(f"Difficulty: {difficulties[selected_difficulty]}", True, WHITE)
-    screen.blit(diff_text, (WIDTH//2 - diff_text.get_width()//2, 400))
+    prefix = "> " if selected_menu_item == 1 else "  "
+    diff_text = font.render(prefix + f"Difficulty: {difficulties[selected_difficulty]}", True, WHITE)
+    screen.blit(diff_text, (WIDTH//2 - diff_text.get_width()//2, 315))
     
     # Speed
-    speed_text = font.render(f"Scroll Speed: {scroll_speed}", True, WHITE)
-    screen.blit(speed_text, (WIDTH//2 - speed_text.get_width()//2, 450))
+    prefix = "> " if selected_menu_item == 2 else "  "
+    speed_text = font.render(prefix + f"Scroll Speed: {scroll_speed}", True, WHITE)
+    screen.blit(speed_text, (WIDTH//2 - speed_text.get_width()//2, 365))
     
-    # Instructions
+    # Instructions at bottom
+    pygame.draw.rect(screen, (40, 40, 80), (0, HEIGHT-60, WIDTH, 60))
     inst_text = font.render("Press ENTER to start", True, WHITE)
-    screen.blit(inst_text, (WIDTH//2 - inst_text.get_width()//2, 550))
+    screen.blit(inst_text, (WIDTH//2 - inst_text.get_width()//2, HEIGHT-40))
 
 def draw_pause_menu(screen, font, options, selected_option):
     """Draw the pause menu screen"""
     # Darkened overlay
     overlay = pygame.Surface((WIDTH, HEIGHT))
     overlay.fill((0, 0, 0))
-    overlay.set_alpha(128)
+    overlay.set_alpha(180)
     screen.blit(overlay, (0, 0))
+    
+    # Pause box
+    menu_height = 250
+    menu_rect = pygame.Rect(WIDTH//4, HEIGHT//2 - menu_height//2, WIDTH//2, menu_height)
+    pygame.draw.rect(screen, (40, 40, 80), menu_rect)
+    pygame.draw.rect(screen, WHITE, menu_rect, 2)
     
     # Pause title
     title = font.render("PAUSED", True, WHITE)
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 200))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//2 - 80))
+    pygame.draw.line(screen, WHITE, 
+                    (WIDTH//2 - 100, HEIGHT//2 - 40),
+                    (WIDTH//2 + 100, HEIGHT//2 - 40), 2)
     
     # Options
     for i, option in enumerate(options):
+        if i == selected_option:
+            pygame.draw.rect(screen, (60, 60, 100), 
+                           (WIDTH//4 + 20, HEIGHT//2 + i*50 - 10, WIDTH//2 - 40, 40))
         color = WHITE if i == selected_option else GRAY
         text = font.render(option, True, color)
-        screen.blit(text, (WIDTH//2 - text.get_width()//2, 300 + i*50))
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2 + i*50))
 
 def draw_results(screen, font, score_tracker):
     """Draw the results screen"""
@@ -759,49 +805,110 @@ def handle_note_hit(key, game_state, notes, score_tracker):
         closest_note.kill()
     else:
         score_tracker.combo = 0
-        score_tracker.misses += 1
+        score_tracker.add_hit(hit_type, 0)  # Add this line to count misses
+        closest_note.kill()
+
+
+
+def get_grade(accuracy):
+    """Return grade based on accuracy percentage"""
+    if accuracy >= 95: return 'S'
+    elif accuracy >= 90: return 'A'
+    elif accuracy >= 80: return 'B'
+    elif accuracy >= 70: return 'C'
+    elif accuracy >= 60: return 'D'
+    else: return 'F'
 
 def draw_results_screen(screen, score_tracker, font):
     """Renders the results screen showing final score and statistics"""
-    # Background overlay
+    # Background with gradient
+    background = create_background()
+    screen.blit(background, (0, 0))
+    
+    # Semi-transparent overlay
     overlay = pygame.Surface((WIDTH, HEIGHT))
     overlay.fill((0, 0, 0))
-    overlay.set_alpha(200)
+    overlay.set_alpha(180)
     screen.blit(overlay, (0, 0))
     
-    # Title
-    title = font.render("Results", True, WHITE)
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 100))
-    
-    # Calculate final accuracy
+    # Calculate stats
+    accuracy = 0
     if score_tracker.total_notes > 0:
         accuracy = ((score_tracker.perfect_hits * 100 + 
                     score_tracker.great_hits * 75 + 
                     score_tracker.good_hits * 50) / 
                    (score_tracker.total_notes * 100)) * 100
-    else:
-        accuracy = 0
     
-    # Stats to display
+    grade = get_grade(accuracy)
+    
+    # Draw decorative box
+    box_rect = pygame.Rect(WIDTH//4, HEIGHT//6, WIDTH//2, HEIGHT*2//3)
+    pygame.draw.rect(screen, CYBER_GRID, box_rect)
+    pygame.draw.rect(screen, VAPORWAVE_PINK, box_rect, 2)
+    
+    # Title with glow effect
+    title = font.render("RESULTS", True, VAPORWAVE_PINK)
+    title_glow = font.render("RESULTS", True, VAPORWAVE_BLUE)
+    screen.blit(title_glow, (WIDTH//2 - title.get_width()//2 + 2, HEIGHT//6 + 22))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//6 + 20))
+    
+    # Grade display
+    grade_font = pygame.font.Font(None, 120)
+    grade_text = grade_font.render(grade, True, VAPORWAVE_PINK)
+    grade_glow = grade_font.render(grade, True, VAPORWAVE_BLUE)
+    screen.blit(grade_glow, (WIDTH//2 - grade_text.get_width()//2 + 2, HEIGHT//6 + 82))
+    screen.blit(grade_text, (WIDTH//2 - grade_text.get_width()//2, HEIGHT//6 + 80))
+    
+    # Main stats with neon effect
     stats = [
-        f"Final Score: {score_tracker.score}",
-        f"Max Combo: {score_tracker.max_combo}",
+        f"Score: {score_tracker.score}",
         f"Accuracy: {accuracy:.1f}%",
-        "",
-        f"Perfect: {score_tracker.perfect_hits} ({(score_tracker.perfect_hits/score_tracker.total_notes*100):.1f}%)" if score_tracker.total_notes > 0 else "Perfect: 0",
-        f"Great: {score_tracker.great_hits} ({(score_tracker.great_hits/score_tracker.total_notes*100):.1f}%)" if score_tracker.total_notes > 0 else "Great: 0",
-        f"Good: {score_tracker.good_hits} ({(score_tracker.good_hits/score_tracker.total_notes*100):.1f}%)" if score_tracker.total_notes > 0 else "Good: 0",
-        f"Miss: {score_tracker.misses} ({(score_tracker.misses/score_tracker.total_notes*100):.1f}%)" if score_tracker.total_notes > 0 else "Miss: 0"
+        f"Max Combo: {score_tracker.max_combo}",
     ]
     
-    # Draw stats
+    start_y = HEIGHT//2
     for i, stat in enumerate(stats):
-        text = font.render(stat, True, WHITE)
-        screen.blit(text, (WIDTH//2 - text.get_width()//2, 200 + i*40))
+        text = font.render(stat, True, VAPORWAVE_PINK)
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, start_y + i*40))
     
-    # Continue prompt
-    prompt = font.render("Press Enter to continue", True, WHITE)
-    screen.blit(prompt, (WIDTH//2 - prompt.get_width()//2, HEIGHT - 100))
+    # Continue prompt with pulsing effect
+    time = pygame.time.get_ticks()
+    alpha = int(abs(math.sin(time/500)) * 255)
+    prompt = font.render("Press Enter to continue", True, VAPORWAVE_PINK)
+    prompt.set_alpha(alpha)
+    screen.blit(prompt, (WIDTH//2 - prompt.get_width()//2, HEIGHT - 60))
+
+# Add new color constants
+VAPORWAVE_PINK = (255, 89, 225)
+VAPORWAVE_BLUE = (64, 224, 208)
+VAPORWAVE_PURPLE = (148, 0, 211)
+CYBER_GRID = (40, 0, 80)
+
+def create_background():
+    """Create stylized background with city and grid"""
+    background = pygame.Surface((WIDTH, HEIGHT))
+    
+    # Gradient sky
+    for y in range(HEIGHT):
+        color = (
+            int(40 + (y/HEIGHT) * 20),  # R
+            int((y/HEIGHT) * 89),        # G
+            int(80 + (y/HEIGHT) * 145)   # B
+        )
+        pygame.draw.line(background, color, (0, y), (WIDTH, y))
+    
+    # Cyber grid
+    grid_spacing = 40
+    for x in range(0, WIDTH, grid_spacing):
+        pygame.draw.line(background, VAPORWAVE_PURPLE, 
+                        (x, HEIGHT//2), (WIDTH//2, HEIGHT),
+                        1)
+    for x in range(WIDTH, 0, -grid_spacing):
+        pygame.draw.line(background, VAPORWAVE_PURPLE,
+                        (x, HEIGHT//2), (WIDTH//2, HEIGHT),
+                        1)
+    
+    return background
 
 if __name__ == "__main__":
     main()
