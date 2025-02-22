@@ -202,6 +202,46 @@ for level in range(1, 12):  # Changed range to include level 11
             backgrounds[level] = background
         else:
             backgrounds[level] = BLACK  # Fallback to black if image not found
+            
+try:
+    menu_background_image = pygame.image.load(os.path.join(ASSETS_DIR, 'backgrounds', 'menu_background.png')).convert()
+    menu_background_image = pygame.transform.scale(menu_background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+except Exception as e:
+    print("Error loading menu background:", e)
+    menu_background_image = None
+    
+def generate_cyberpunk_background(width, height):
+    background = pygame.Surface((width, height))
+    # Create a vertical gradient from dark blue to near-black
+    for y in range(height):
+        # Interpolate between two colors (dark blue and nearly black)
+        r = 0
+        g = 0
+        b = max(0, 35 - int(35 * (y/height)))
+        pygame.draw.line(background, (r, g, b), (0, y), (width, y))
+    
+    # Add a subtle color overlay for extra neon vibe
+    overlay = pygame.Surface((width, height))
+    overlay.fill((10, 0, 30))
+    overlay.set_alpha(40)
+    background.blit(overlay, (0, 0))
+    
+    # Draw a scattering of stars
+    for _ in range(250):
+        x = random.randint(0, width-1)
+        y = random.randint(0, height-1)
+        star_color = random.choice([(255,255,255), (210,210,255), (255,200,200)])
+        pygame.draw.circle(background, star_color, (x, y), random.choice([1, 2]))
+    
+    
+    return background
+
+# Generate and store the background in a global variable
+menu_background_image = generate_cyberpunk_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+def draw_menu_background(screen):
+    # Blit the generated background image
+    screen.blit(menu_background_image, (0, 0))
 
 # Load Player Image
 try:
@@ -826,53 +866,65 @@ class Boss(pygame.sprite.Sprite):
 
 # Functions to display messages
 def display_game_over():
-    # Create a semi-transparent overlay
+    # Draw static menu background with overlay
+    draw_menu_background(screen)
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-    overlay.fill(BLACK)
-    overlay.set_alpha(128)  # 50% transparent
+    overlay.set_alpha(150)
+    overlay.fill((0, 0, 0))
     screen.blit(overlay, (0, 0))
     
-    text = font.render("Game Over!", True, WHITE)
+    # Draw central cyberpunk-style message
+    title = font.render("GAME OVER", True, (255, 20, 147))
     score_text = font.render(f"Final Score: {player.score:,}", True, WHITE)
-    continue_text = font.render("Press R to Restart or C to Continue", True, WHITE)
+    instr_text = font.render("Press R to Restart, C to Continue, M for Menu", True, (0, 255, 255))
     
-    text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40))
+    title_rect = title.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60))
     score_rect = score_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
-    continue_rect = continue_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 40))
+    instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60))
     
-    screen.blit(text, text_rect)
+    screen.blit(title, title_rect)
     screen.blit(score_text, score_rect)
-    screen.blit(continue_text, continue_rect)
+    screen.blit(instr_text, instr_rect)
     pygame.display.flip()
 
 def display_game_won():
-    screen.fill(BLACK)
+    # Draw static menu background with a neon overlay
+    draw_menu_background(screen)
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    overlay.set_alpha(150)
+    overlay.fill((10, 10, 40))
+    screen.blit(overlay, (0, 0))
     
-    title_text = font.render("Congratulations! You've Won!", True, WHITE)
+    title_text = font.render("CONGRATULATIONS!", True, (0, 255, 255))
     score_text = font.render(f"Final Score: {player.score:,}", True, WHITE)
     
-    # Add legitimacy indicator
     if player.continued_run:
-        legit_text = font.render("*Continued Run*", True, RED)
+        status_text = font.render("*Continued Run*", True, RED)
     else:
-        legit_text = font.render("Legitimate Clear!", True, GREEN)
+        status_text = font.render("Legitimate Clear!", True, GREEN)
+        
+    instr_text = font.render("Press R to Play Again, M for Menu", True, (255, 105, 180))
     
-    press_text = font.render("Press R to Play Again", True, WHITE)
-    
-    title_rect = title_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60))
+    title_rect = title_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80))
     score_rect = score_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20))
-    legit_rect = legit_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20))
-    press_rect = press_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60))
+    status_rect = status_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20))
+    instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80))
     
     screen.blit(title_text, title_rect)
     screen.blit(score_text, score_rect)
-    screen.blit(legit_text, legit_rect)
-    screen.blit(press_text, press_rect)
+    screen.blit(status_text, status_rect)
+    screen.blit(instr_text, instr_rect)
     pygame.display.flip()
 
 def display_level_completion(level):
-    screen.fill(BLACK)
-    level_text = font.render(f"Level {level} Complete!", True, WHITE)
+    # Draw static menu background with overlay
+    draw_menu_background(screen)
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    overlay.set_alpha(150)
+    overlay.fill((20, 20, 40))
+    screen.blit(overlay, (0, 0))
+    
+    level_text = font.render(f"Level {level} Complete!", True, (0, 255, 255))
     score_text = font.render(f"Current Score: {player.score:,}", True, WHITE)
     
     level_rect = level_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20))
@@ -976,6 +1028,54 @@ def draw_hud():
     if player.continued_run:
         watermark = font.render(WATERMARK_TEXT, True, RED)
         screen.blit(watermark, (SCREEN_WIDTH - watermark.get_width() - 10, 10))
+        
+def start_menu(screen, font, clock):
+    options = ["Start Game", "Return to Main Menu"]
+    selected = 0
+    # Use a larger neon font for the title
+    title_font = pygame.font.SysFont("Arial", 72, bold=True)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    return options[selected]
+        # Draw static menu background
+        draw_menu_background(screen)
+        
+        # Add a semi-transparent overlay for a cyberpunk effect
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(100)
+        overlay.fill((10, 10, 40))
+        screen.blit(overlay, (0,0))
+        
+        # Draw neon title
+        title_text = title_font.render("BULLET HELL", True, (0, 255, 255))
+        glow = title_font.render("BULLET HELL", True, (255, 20, 147))
+        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
+        screen.blit(glow, (title_rect.x - 2, title_rect.y - 2))
+        screen.blit(title_text, title_rect)
+        
+        # Draw menu options
+        for i, option in enumerate(options):
+            color = (0, 255, 255) if i == selected else (200, 200, 200)
+            option_text = font.render(option, True, color)
+            option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + i * 40))
+            screen.blit(option_text, option_rect)
+            
+        # Draw instruction line with neon accent
+        instr_text = font.render("Use UP/DOWN & ENTER", True, (255, 105, 180))
+        instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
+        screen.blit(instr_text, instr_rect)
+        
+        pygame.display.flip()
+        clock.tick(FPS)
 
 class BulletHellGame:
     def __init__(self):
@@ -1005,204 +1105,342 @@ class BulletHellGame:
                     self.running = False
 
     def run(self):
+        while True:
+            menu_choice = start_menu(self.screen, font, self.clock)
+            if menu_choice == "Return to Main Menu":
+                return  # Return control back to main.py
+            reset_game(False)  # Reset game state before a new session
+            self.running = True
+            self.game_loop()  # Run one game session
+            
+    def game_loop(self):
+        global game_over, boss_spawned, boss_active, level_complete, level, game_won
+        global wave_number, wave_start_time, level_start_time
+        wave_start_time = pygame.time.get_ticks()
+        level_start_time = pygame.time.get_ticks()
         while self.running:
             self.clock.tick(FPS)
-            self.handle_events()
-            
-            # Main game logic here
-            # (Copy existing game loop code)
-            
-            # Update display
-            pygame.display.flip()
-        
-        # Cleanup when game ends
-        clean_assets()
+            now = pygame.time.get_ticks()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    pygame.quit()
+                    return
+                elif event.type == pygame.KEYDOWN:
+                    if game_over:
+                        if event.key == pygame.K_m:
+                            self.running = False  # Exit to start menu
+                        elif event.key == pygame.K_r:
+                            reset_game(False)
+                        elif event.key == pygame.K_c:
+                            reset_game(True)
+            if not game_over:
+                # Enemy spawning logic
+                waves_per_level = 3 + (level // 2)
+                if not boss_spawned and not level_complete:
+                    if wave_number < waves_per_level:
+                        if now - wave_start_time > wave_duration:
+                            wave_number += 1
+                            spawn_enemy_wave()
+                        elif len(enemies) == 0:
+                            wave_number += 1
+                            spawn_enemy_wave()
+                    else:
+                        if len(enemies) == 0:
+                            spawn_boss()
+                        elif now - level_start_time > level_duration:
+                            for enemy in enemies:
+                                enemy.kill()
+                            spawn_boss()
+                elif boss_spawned and boss_active:
+                    max_enemies_during_boss = min(2 + level, 10)
+                    enemy_spawn_chance = max(0.005, 0.02 - level * 0.001)
+                    if len(enemies) < max_enemies_during_boss and random.random() < enemy_spawn_chance:
+                        enemy_pattern = random.choice(['aimed', 'random', 'circle'])
+                        enemy = Enemy(level, enemy_pattern)
+                        all_sprites.add(enemy)
+                        enemies.add(enemy)
+                    if not bosses:
+                        boss_active = False
+                        level_complete = True
+
+                # Update sprites and handle collisions/score as before
+                all_sprites.update()
+                
+                waves_per_level = 3 + (level // 2)
+
+                if not boss_spawned and not level_complete:
+                    if wave_number < waves_per_level:
+                        if now - wave_start_time > wave_duration:
+                            wave_number += 1
+                            spawn_enemy_wave()
+                        elif len(enemies) == 0:
+                            wave_number += 1
+                            spawn_enemy_wave()
+                    else:
+                        if len(enemies) == 0:
+                            spawn_boss()
+                        elif now - level_start_time > level_duration:
+                            for enemy in enemies:
+                                enemy.kill()
+                            spawn_boss()
+                elif boss_spawned and boss_active:
+                    max_enemies_during_boss = min(2 + level, 10)
+                    enemy_spawn_chance = max(0.005, 0.02 - level * 0.001)
+                    if len(enemies) < max_enemies_during_boss and random.random() < enemy_spawn_chance:
+                        enemy_pattern = random.choice(['aimed', 'random', 'circle'])
+                        enemy = Enemy(level, enemy_pattern)
+                        all_sprites.add(enemy)
+                        enemies.add(enemy)
+                    if not bosses:
+                        boss_active = False
+                        level_complete = True
+
+                enemy_hits = pygame.sprite.groupcollide(enemies, bullets, False, True)
+                for enemy, bullet_list in enemy_hits.items():
+                    for bullet in bullet_list:
+                        enemy.hp -= bullet.damage
+                        if enemy.hp <= 0:
+                            enemy.die()
+
+                boss_hits = pygame.sprite.groupcollide(bosses, bullets, False, True)
+                for boss, bullet_list in boss_hits.items():
+                    for bullet in bullet_list:
+                        boss.health -= bullet.damage
+                        if boss.health <= 0:
+                            boss.die()
+
+                player_hitbox = player.rect.center
+
+                hit = False
+                for bullet in enemy_bullets:
+                    if bullet.rect.collidepoint(player_hitbox):
+                        bullet.kill()
+                        hit = True
+                if hit:
+                    player.lives -= 1
+                    if player.lives <= 0:
+                        game_over = True
+
+                collide = False
+                for enemy in enemies:
+                    if enemy.rect.collidepoint(player_hitbox):
+                        enemy.kill()
+                        collide = True
+                if collide:
+                    player.lives -= 1
+                    if player.lives <= 0:
+                        game_over = True
+
+                pp_hits = pygame.sprite.spritecollide(player, power_points, True)
+                for pp in pp_hits:
+                    player.pp_collected += 1
+                    if player.pp_collected >= player.pp_needed:
+                        player.power_up()
+
+                for bullet in enemy_bullets:
+                    if not bullet.grazed:
+                        if bullet.rect.colliderect(player.rect):
+                            if not bullet.rect.collidepoint(player.rect.center):
+                                bullet.grazed = True
+                                point = Point(bullet.rect.centerx, bullet.rect.centery, 5000)
+                                all_sprites.add(point)
+                                points.add(point)
+
+                points_collected = pygame.sprite.spritecollide(player, points, True)
+                for point in points_collected:
+                    player.score += point.value
+
+                if level_complete:
+                    if level == 10:
+                        level = 11
+                        level_complete = False
+                        boss_spawned = False
+                        boss_active = False
+                        spawn_boss()
+                    elif level >= max_levels:
+                        game_won = True
+                        game_over = True
+                    else:
+                        level += 1
+                        level_complete = False
+                        boss_spawned = False
+                        boss_active = False
+                        wave_number = 0
+                        waves_per_level = 3 + (level // 2)
+                        level_start_time = pygame.time.get_ticks()
+                        display_level_completion(level - 1)
+
+                # Drawing code
+                if isinstance(backgrounds.get(level, BLACK), pygame.Surface):
+                    self.screen.blit(backgrounds[level], (0, 0))
+                else:
+                    self.screen.fill(backgrounds[level])
+                all_sprites.draw(self.screen)
+                pygame.draw.circle(self.screen, RED, player.rect.center, 3)
+                for boss in bosses:
+                    boss.draw_health_bar(self.screen)
+                draw_hud()
+                pygame.display.flip()
+            else:
+                if game_won:
+                    display_game_won()
+                else:
+                    display_game_over()
+        # End of game_loop returns to run() to show the start menu again
 
 # Main Game Loop
-running = True
-wave_start_time = pygame.time.get_ticks()
-level_start_time = pygame.time.get_ticks()
+# ...existing code above remains unchanged...
 
-while running:
-    clock.tick(FPS)
-    now = pygame.time.get_ticks()
+# Main Game Loop
+def main():
+    global game_over, boss_spawned, boss_active, level_complete, level, game_won
+    global wave_number, wave_start_time, level_start_time
+    running = True
+    wave_start_time = pygame.time.get_ticks()
+    level_start_time = pygame.time.get_ticks()
+    while running:
+        clock.tick(FPS)
+        now = pygame.time.get_ticks()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN and game_over:
+                if event.key == pygame.K_m:
+                    running = False  # Break out to return to the start menu
+                elif game_won:
+                    if event.key == pygame.K_r:
+                        reset_game(False)
+                else:
+                    if event.key == pygame.K_r:
+                        reset_game(False)
+                    elif event.key == pygame.K_c:
+                        reset_game(True)
+        if not game_over:
+            all_sprites.update()
 
-    # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN and game_over:
+            waves_per_level = 3 + (level // 2)
+
+            if not boss_spawned and not level_complete:
+                if wave_number < waves_per_level:
+                    if now - wave_start_time > wave_duration:
+                        wave_number += 1
+                        spawn_enemy_wave()
+                    elif len(enemies) == 0:
+                        wave_number += 1
+                        spawn_enemy_wave()
+                else:
+                    if len(enemies) == 0:
+                        spawn_boss()
+                    elif now - level_start_time > level_duration:
+                        for enemy in enemies:
+                            enemy.kill()
+                        spawn_boss()
+            elif boss_spawned and boss_active:
+                max_enemies_during_boss = min(2 + level, 10)
+                enemy_spawn_chance = max(0.005, 0.02 - level * 0.001)
+                if len(enemies) < max_enemies_during_boss and random.random() < enemy_spawn_chance:
+                    enemy_pattern = random.choice(['aimed', 'random', 'circle'])
+                    enemy = Enemy(level, enemy_pattern)
+                    all_sprites.add(enemy)
+                    enemies.add(enemy)
+                if not bosses:
+                    boss_active = False
+                    level_complete = True
+
+            enemy_hits = pygame.sprite.groupcollide(enemies, bullets, False, True)
+            for enemy, bullet_list in enemy_hits.items():
+                for bullet in bullet_list:
+                    enemy.hp -= bullet.damage
+                    if enemy.hp <= 0:
+                        enemy.die()
+
+            boss_hits = pygame.sprite.groupcollide(bosses, bullets, False, True)
+            for boss, bullet_list in boss_hits.items():
+                for bullet in bullet_list:
+                    boss.health -= bullet.damage
+                    if boss.health <= 0:
+                        boss.die()
+
+            player_hitbox = player.rect.center
+
+            hit = False
+            for bullet in enemy_bullets:
+                if bullet.rect.collidepoint(player_hitbox):
+                    bullet.kill()
+                    hit = True
+            if hit:
+                player.lives -= 1
+                if player.lives <= 0:
+                    game_over = True
+
+            collide = False
+            for enemy in enemies:
+                if enemy.rect.collidepoint(player_hitbox):
+                    enemy.kill()
+                    collide = True
+            if collide:
+                player.lives -= 1
+                if player.lives <= 0:
+                    game_over = True
+
+            pp_hits = pygame.sprite.spritecollide(player, power_points, True)
+            for pp in pp_hits:
+                player.pp_collected += 1
+                if player.pp_collected >= player.pp_needed:
+                    player.power_up()
+
+            for bullet in enemy_bullets:
+                if not bullet.grazed:
+                    if bullet.rect.colliderect(player.rect):
+                        if not bullet.rect.collidepoint(player.rect.center):
+                            bullet.grazed = True
+                            point = Point(bullet.rect.centerx, bullet.rect.centery, 5000)
+                            all_sprites.add(point)
+                            points.add(point)
+
+            points_collected = pygame.sprite.spritecollide(player, points, True)
+            for point in points_collected:
+                player.score += point.value
+
+            if level_complete:
+                if level == 10:
+                    level = 11
+                    level_complete = False
+                    boss_spawned = False
+                    boss_active = False
+                    spawn_boss()
+                elif level >= max_levels:
+                    game_won = True
+                    game_over = True
+                else:
+                    level += 1
+                    level_complete = False
+                    boss_spawned = False
+                    boss_active = False
+                    wave_number = 0
+                    waves_per_level = 3 + (level // 2)
+                    level_start_time = pygame.time.get_ticks()
+                    display_level_completion(level - 1)
+
+            if isinstance(backgrounds.get(level, BLACK), pygame.Surface):
+                screen.blit(backgrounds[level], (0, 0))
+            else:
+                screen.fill(backgrounds[level])
+            all_sprites.draw(screen)
+            pygame.draw.circle(screen, RED, player.rect.center, 3)
+            for boss in bosses:
+                boss.draw_health_bar(screen)
+            draw_hud()
+            pygame.display.flip()
+        else:
             if game_won:
-                if event.key == pygame.K_r:
-                    reset_game(False)  # Only allow full reset after winning
+                display_game_won()
             else:
-                if event.key == pygame.K_r:
-                    reset_game(False)  # Regular restart
-                elif event.key == pygame.K_c:
-                    reset_game(True)   # Continue option only available when not won
+                display_game_over()
+    clean_assets()
+    pygame.quit()
+    return  # Removed sys.exit() to allow proper return to the start menu
 
-    if not game_over:
-        # Update all sprites
-        all_sprites.update()
-
-        # Enemy wave and boss spawning logic
-        waves_per_level = 3 + (level // 2)  # Increase waves per level over time
-
-        if not boss_spawned and not level_complete:
-            if wave_number < waves_per_level:
-                # Check if wave duration has passed
-                if now - wave_start_time > wave_duration:
-                    wave_number += 1
-                    spawn_enemy_wave()
-                elif len(enemies) == 0:
-                    # All enemies in current wave defeated, spawn next wave
-                    wave_number += 1
-                    spawn_enemy_wave()
-            else:
-                # All waves completed
-                if len(enemies) == 0:
-                    # Spawn boss
-                    spawn_boss()
-                elif now - level_start_time > level_duration:
-                    # Level timeout reached, despawn enemies and spawn boss
-                    for enemy in enemies:
-                        enemy.kill()
-                    spawn_boss()
-        elif boss_spawned and boss_active:
-            # During boss fight, spawn additional enemies with cap
-            max_enemies_during_boss = min(2 + level, 10)  # Increase cap faster
-            enemy_spawn_chance = max(0.005, 0.02 - level * 0.001)
-            if len(enemies) < max_enemies_during_boss and random.random() < enemy_spawn_chance:
-                enemy_pattern = random.choice(['aimed', 'random', 'circle'])
-                enemy = Enemy(level, enemy_pattern)
-                all_sprites.add(enemy)
-                enemies.add(enemy)
-
-            # When boss is defeated, remove remaining enemies
-            if not bosses:
-                boss_active = False
-                level_complete = True  # Level completed when boss is defeated
-
-        # Collision detection
-        # Player bullets hit enemies
-        enemy_hits = pygame.sprite.groupcollide(enemies, bullets, False, True)
-        for enemy, bullet_list in enemy_hits.items():
-            for bullet in bullet_list:
-                enemy.hp -= bullet.damage
-                if enemy.hp <= 0:
-                    enemy.die()
-
-        # Player bullets hit bosses
-        boss_hits = pygame.sprite.groupcollide(bosses, bullets, False, True)
-        for boss, bullet_list in boss_hits.items():
-            for bullet in bullet_list:
-                boss.health -= bullet.damage
-                if boss.health <= 0:
-                    boss.die()
-
-        # Modify collision detection to use only the player's hitbox (red dot)
-        player_hitbox = player.rect.center
-
-        # Enemy bullets hit player
-        hit = False
-        for bullet in enemy_bullets:
-            if bullet.rect.collidepoint(player_hitbox):
-                bullet.kill()
-                hit = True
-        if hit:
-            player.lives -= 1
-            if player.lives <= 0:
-                game_over = True
-
-        # Enemies collide with player
-        collide = False
-        for enemy in enemies:
-            if enemy.rect.collidepoint(player_hitbox):
-                enemy.kill()
-                collide = True
-        if collide:
-            player.lives -= 1
-            if player.lives <= 0:
-                game_over = True
-
-        # Power-ups collected by player
-        pp_hits = pygame.sprite.spritecollide(player, power_points, True)
-        for pp in pp_hits:
-            player.pp_collected += 1
-            if player.pp_collected >= player.pp_needed:
-                player.power_up()
-
-        # Grace system - check if bullets hit player avatar but not hitbox
-        for bullet in enemy_bullets:
-            if not bullet.grazed:  # Only check non-grazed bullets
-                # Check if bullet hits player avatar (the blue circle)
-                if bullet.rect.colliderect(player.rect):
-                    # But not the hitbox (the red dot)
-                    if not bullet.rect.collidepoint(player.rect.center):
-                        bullet.grazed = True  # Mark bullet as grazed
-                        # Create point item for graze
-                        point = Point(bullet.rect.centerx, bullet.rect.centery, 5000)
-                        all_sprites.add(point)
-                        points.add(point)
-
-        # Points collection
-        points_collected = pygame.sprite.spritecollide(player, points, True)
-        for point in points_collected:
-            player.score += point.value
-
-        # Level completion logic
-        if level_complete:
-            if level == 10:  # First phase of final boss defeated
-                level = 11
-                level_complete = False
-                boss_spawned = False
-                boss_active = False
-                spawn_boss()  # Spawn second phase immediately
-            elif level >= max_levels:
-                game_won = True
-                game_over = True  # This ensures the win screen is displayed
-            else:
-                level += 1
-                level_complete = False
-                boss_spawned = False
-                boss_active = False
-                wave_number = 0
-                waves_per_level = 3 + (level // 2)
-                level_start_time = pygame.time.get_ticks()
-                # Display level completion message
-                display_level_completion(level - 1)
-
-        # Drawing
-        if isinstance(backgrounds.get(level, BLACK), pygame.Surface):
-            screen.blit(backgrounds[level], (0, 0))
-        else:
-            screen.fill(backgrounds[level])
-
-        all_sprites.draw(screen)
-
-        # Draw Player Hitbox
-        pygame.draw.circle(screen, RED, player.rect.center, 3)
-
-        # Remove the line at the two-thirds mark
-
-        # Draw Health Bars
-        for boss in bosses:
-            boss.draw_health_bar(screen)
-
-        # Display Lives, Level, and Power Level with appropriate color
-        draw_hud()
-
-        pygame.display.flip()
-
-    else:
-        # Display Game Over or Game Won Message
-        if game_won:
-            display_game_won()
-        else:
-            display_game_over()
-
-# Clean up assets before exiting
-clean_assets()
-
-pygame.quit()
-sys.exit()
+if __name__ == "__main__":
+    main()

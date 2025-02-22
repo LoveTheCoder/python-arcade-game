@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flexible Grid Layout</title>
+  <style>
+    /* Main grid: 1 row, 4 columns by default */
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      border: 1px solid black;
+    }
+    .grid > .cell {
+      width: 25%;
+      border: 1px solid black;
+      box-sizing: border-box;
+      padding: 10px;
+    }
+    /* Nested grid inside each cell: same default, 1×4 */
+    .nested-grid {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .nested-grid > .nested-cell {
+      width: 25%;
+      border: 1px solid black;
+      box-sizing: border-box;
+      padding: 5px;
+      text-align: center;
+    }
+    /* For window widths less than 720px, switch to 2×2 grids */
+    @media (max-width: 720px) {
+      .grid > .cell {
+        width: 50%;
+      }
+      .nested-grid > .nested-cell {
+        width: 50%;
+      }
+    }
+    /* For window widths less than 360px, switch to 4×1 grids */
+    @media (max-width: 360px) {
+      .grid > .cell {
+        width: 100%;
+      }
+      .nested-grid > .nested-cell {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid" id="mainGrid">
+    <!-- Four cells in the main grid -->
+    <div class="cell">
+      Cell 1
+      <div class="nested-grid">
+        <div class="nested-cell">Nested 1</div>
+        <div class="nested-cell">Nested 2</div>
+        <div class="nested-cell">Nested 3</div>
+        <div class="nested-cell">Nested 4</div>
+      </div>
+    </div>
+    <div class="cell">
+      Cell 2
+      <div class="nested-grid">
+        <div class="nested-cell">Nested 1</div>
+        <div class="nested-cell">Nested 2</div>
+        <div class="nested-cell">Nested 3</div>
+        <div class="nested-cell">Nested 4</div>
+      </div>
+    </div>
+    <div class="cell">
+      Cell 3
+      <div class="nested-grid">
+        <div class="nested-cell">Nested 1</div>
+        <div class="nested-cell">Nested 2</div>
+        <div class="nested-cell">Nested 3</div>
+        <div class="nested-cell">Nested 4</div>
+      </div>
+    </div>
+    <div class="cell">
+      Cell 4
+      <div class="nested-grid">
+        <div class="nested-cell">Nested 1</div>
+        <div class="nested-cell">Nested 2</div>
+        <div class="nested-cell">Nested 3</div>
+        <div class="nested-cell">Nested 4</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // JavaScript: log window size on resize (optional)
+    window.addEventListener('resize', function() {
+      console.log('Window size: ' + window.innerWidth + ' x ' + window.innerHeight);
+    });
+  </script>
+</body>
+</html>

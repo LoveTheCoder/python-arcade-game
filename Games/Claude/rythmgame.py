@@ -522,12 +522,13 @@ def render(screen, game_state, notes, score_tracker, menu_font):
             screen.blit(acc_text, (WIDTH - acc_text.get_width() - 10, 10))
 
 def handle_menu_input(event, game_state):
-    """Add this function above main()"""
+    """Handle menu navigation input"""
     if event.key == pygame.K_UP:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
+        # No change for menu item 2 (speed) or 3 (exit)
     elif event.key == pygame.K_DOWN:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
@@ -538,8 +539,8 @@ def handle_menu_input(event, game_state):
     elif event.key == pygame.K_RIGHT and game_state.selected_menu_item == 2:
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
     elif event.key == pygame.K_TAB:
-        game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 3
-        
+        game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4  # Now 4 items (0,1,2,3)
+
 def calculate_music_delay(scroll_speed):
     """Calculate delay based on scroll speed - slower speed needs more delay"""
     return int(2500 * (5.0 / scroll_speed))  # 2.5 seconds at speed 5, scales inversely
@@ -583,12 +584,15 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if game_state.current_state == STATE_MENU:
                     if event.key == pygame.K_RETURN:
-                        # Load song first
-                        game_state.current_song = SONGS[game_state.selected_song_index]
-                        melody = game_state.current_song.melody_func()
-                        game_state.music, duration, _ = generate_music(melody)
-                        # Start song with same behavior as restart
-                        start_song(game_state)
+                        if game_state.selected_menu_item == 3:
+                            # Selected "Return to Main Menu"
+                            return  # Exit main() so control goes back to main.py
+                        else:
+                            # Start the song as before
+                            game_state.current_song = SONGS[game_state.selected_song_index]
+                            melody = game_state.current_song.melody_func()
+                            game_state.music, duration, _ = generate_music(melody)
+                            start_song(game_state)
                     else:
                         handle_menu_input(event, game_state)
                 
@@ -677,43 +681,53 @@ def main():
     pygame.quit()
 
 def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index, selected_menu_item):
-    """Draw the main menu screen"""
+    """Draw the main menu screen with options moved upward"""
     # Draw background
     background = create_background()
     screen.blit(background, (0, 0))
     
-    # Title with neon effect
+    # Title with neon effect (moved up)
     title = font.render("RHYTHM GAME", True, VAPORWAVE_PINK)
     title_shadow = font.render("RHYTHM GAME", True, VAPORWAVE_BLUE)
-    screen.blit(title_shadow, (WIDTH//2 - title.get_width()//2 + 2, 92))
-    screen.blit(title, (WIDTH//2 - title.get_width()//2, 90))
+    screen.blit(title_shadow, (WIDTH//2 - title.get_width()//2 + 2, 70))
+    screen.blit(title, (WIDTH//2 - title.get_width()//2, 68))
     
-    # Song selection with background highlight
+    # Song selection with background highlight (start higher)
     for i, song in enumerate(SONGS):
+        song_y = 120 + i * 35  # new start position for songs
         if i == selected_song_index and selected_menu_item == 0:
-            pygame.draw.rect(screen, (40, 40, 80), (WIDTH//4, 180 + i*35, WIDTH//2, 30))
+            pygame.draw.rect(screen, (40, 40, 80), (WIDTH//4, song_y, WIDTH//2, 30))
         prefix = "> " if (i == selected_song_index and selected_menu_item == 0) else "  "
         color = WHITE if i == selected_song_index else GRAY
         text = font.render(prefix + song.name, True, color)
-        screen.blit(text, (WIDTH//2 - text.get_width()//2, 185 + i*35))
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, song_y))
     
-    # Settings section
-    pygame.draw.rect(screen, (30, 30, 60), (WIDTH//4, 300, WIDTH//2, 100))
+    # Settings section moved upward
+    settings_y = 120 + len(SONGS) * 35 + 20
+    pygame.draw.rect(screen, (30, 30, 60), (WIDTH//4, settings_y, WIDTH//2, 140))
     
-    # Difficulty
+    # Difficulty option
+    diff_y = settings_y + 15
     prefix = "> " if selected_menu_item == 1 else "  "
     diff_text = font.render(prefix + f"Difficulty: {difficulties[selected_difficulty]}", True, WHITE)
-    screen.blit(diff_text, (WIDTH//2 - diff_text.get_width()//2, 315))
+    screen.blit(diff_text, (WIDTH//2 - diff_text.get_width()//2, diff_y))
     
-    # Speed
+    # Speed option
+    speed_y = diff_y + 50
     prefix = "> " if selected_menu_item == 2 else "  "
     speed_text = font.render(prefix + f"Scroll Speed: {scroll_speed}", True, WHITE)
-    screen.blit(speed_text, (WIDTH//2 - speed_text.get_width()//2, 365))
+    screen.blit(speed_text, (WIDTH//2 - speed_text.get_width()//2, speed_y))
+    
+    # Return to Main Menu option
+    exit_y = speed_y + 50
+    prefix = "> " if selected_menu_item == 3 else "  "
+    exit_text = font.render(prefix + "Return to Main Menu", True, WHITE)
+    screen.blit(exit_text, (WIDTH//2 - exit_text.get_width()//2, exit_y))
     
     # Instructions at bottom
-    pygame.draw.rect(screen, (40, 40, 80), (0, HEIGHT-60, WIDTH, 60))
-    inst_text = font.render("Press ENTER to start", True, WHITE)
-    screen.blit(inst_text, (WIDTH//2 - inst_text.get_width()//2, HEIGHT-40))
+    pygame.draw.rect(screen, (40, 40, 80), (0, HEIGHT - 60, WIDTH, 60))
+    instruction = font.render("Press ENTER to start", True, WHITE)
+    screen.blit(instruction, (WIDTH//2 - instruction.get_width()//2, HEIGHT - 40))
 
 def draw_pause_menu(screen, font, options, selected_option):
     """Draw the pause menu screen"""

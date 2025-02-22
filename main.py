@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import random
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -17,7 +18,7 @@ class GameMenu:
     def __init__(self):
         pygame.init()
         self.SCREEN_WIDTH = 800
-        self.SCREEN_HEIGHT = 600
+        self.SCREEN_HEIGHT = 480
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         pygame.display.set_caption("Game Menu")
         
@@ -27,31 +28,82 @@ class GameMenu:
         self.GRAY = (128, 128, 128)
         self.SELECTED_COLOR = (0, 255, 0)
         
-        # Menu options
-        self.options = ["Bullet Hell", "Rhythm Game", "Exit"]
+        # Menu options (Exit removed)
+        self.options = ["Bullet Hell", "Rhythm Game"]
         self.selected = 0
         
         # Font
         self.font = pygame.font.Font(None, 64)
+        self.small_font = pygame.font.Font(None, 32)
         
         # Game states
         self.running = True
         self.in_menu = True
 
+    def draw_background(self):
+        # Retro styled background: vertical gradient only.
+        for y in range(self.SCREEN_HEIGHT):
+            # Gradient from dark purple to navy-blue for retro feel
+            r = 40
+            g = max(0, 20 - y // 30)
+            b = min(150 + y // 2, 255)
+            pygame.draw.line(self.screen, (r, g, b), (0, y), (self.SCREEN_WIDTH, y))
+
+    def draw_option_graphic(self, option, rect):
+        if option == "Bullet Hell":
+            # Space themed graphic filling the entire rectangle.
+            # Fill with a dark starry sky (simulate with a gradient).
+            for y in range(rect.top, rect.bottom):
+                intensity = 20 + int(35 * ((y - rect.top) / rect.height))
+                pygame.draw.line(self.screen, (10, 10, intensity), (rect.left, y), (rect.right, y))
+            # Draw a prominent planet filling most of the rectangle.
+            planet_center = (rect.centerx, rect.centery)
+            planet_radius = min(rect.width, rect.height) // 3
+            pygame.draw.circle(self.screen, (100, 50, 150), planet_center, planet_radius)
+            pygame.draw.circle(self.screen, (0, 255, 255), planet_center, planet_radius, 3)
+        
+        elif option == "Rhythm Game":
+            # Vaporwave themed graphic filling the rectangle.
+            # Draw a neon grid that covers the entire rectangle.
+            self.screen.fill((20, 0, 40), rect)
+            num_lines = 6
+            for i in range(1, num_lines):
+                # horizontal lines
+                y = rect.top + i * rect.height // num_lines
+                pygame.draw.line(self.screen, (255, 105, 180), (rect.left, y), (rect.right, y), 2)
+                # vertical lines
+                x = rect.left + i * rect.width // num_lines
+                pygame.draw.line(self.screen, (255, 105, 180), (x, rect.top), (x, rect.bottom), 2)
+            # Draw a synthetic sunset sun in the lower portion of the rectangle.
+            sun_center = (rect.centerx, rect.bottom - rect.height//4)
+            sun_radius = min(rect.width, rect.height) // 5
+            pygame.draw.circle(self.screen, (255, 100, 100), sun_center, sun_radius)
+            pygame.draw.circle(self.screen, (255, 255, 0), sun_center, sun_radius, 3)
+
     def draw_menu(self):
-        self.screen.fill(self.BLACK)
+        self.draw_background()
         
-        # Draw title
-        title = self.font.render("Game Selection", True, self.WHITE)
-        title_rect = title.get_rect(center=(self.SCREEN_WIDTH/2, 100))
-        self.screen.blit(title, title_rect)
+        # Draw title with neon effect.
+        title_text = self.font.render("Game Selection", True, (0, 255, 255))
+        glow = self.font.render("Game Selection", True, (255, 20, 147))
+        title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH/2, 80))
+        self.screen.blit(glow, (title_rect.x+2, title_rect.y+2))
+        self.screen.blit(title_text, title_rect)
         
-        # Draw options
+        # Draw options with their graphic.
         for i, option in enumerate(self.options):
-            color = self.SELECTED_COLOR if i == self.selected else self.WHITE
-            text = self.font.render(option, True, color)
-            rect = text.get_rect(center=(self.SCREEN_WIDTH/2, 250 + i * 100))
-            self.screen.blit(text, rect)
+            rect = pygame.Rect(0, 0, 300, 80)
+            rect.center = (self.SCREEN_WIDTH//2, 200 + i * 100)
+            fill_color = (50, 50, 50) if i != self.selected else (80, 80, 80)
+            pygame.draw.rect(self.screen, fill_color, rect, border_radius=10)
+            border_color = self.SELECTED_COLOR if i == self.selected else self.WHITE
+            pygame.draw.rect(self.screen, border_color, rect, 3, border_radius=10)
+            # Draw the option graphic over the entire rectangle.
+            self.draw_option_graphic(option, rect)
+            # Overlay the option label.
+            text = self.small_font.render(option, True, border_color)
+            text_rect = text.get_rect(center=(rect.centerx, rect.centery))
+            self.screen.blit(text, text_rect)
         
         pygame.display.flip()
 
@@ -60,7 +112,6 @@ class GameMenu:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-                
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     self.selected = (self.selected - 1) % len(self.options)
@@ -74,34 +125,26 @@ class GameMenu:
 
     def run(self):
         clock = pygame.time.Clock()
-        
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
-                
                 if action == "Bullet Hell":
                     self.in_menu = False
-                    pygame.display.set_mode((800, 480))  # Set correct resolution for Bullet Hell
+                    pygame.display.set_mode((800, 480))
                     game = BulletHellGame()
                     game.run()
-                    # Reinitialize display for menu
                     self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
                     self.in_menu = True
-                    
                 elif action == "Rhythm Game":
                     self.in_menu = False
-                    pygame.display.set_mode((400, 800))  # Set correct resolution for Rhythm Game
+                    pygame.display.set_mode((800, 480))
                     rhythm_game_main()
-                    # Reinitialize display for menu
                     self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
                     self.in_menu = True
-                    
                 elif action == "Exit" or action == "QUIT":
                     self.running = False
-            
             clock.tick(60)
-        
         pygame.quit()
 
 if __name__ == "__main__":
