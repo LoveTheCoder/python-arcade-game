@@ -1,57 +1,61 @@
 from decimal import Decimal, getcontext
 
-# Set precision high enough to calculate 100 digits after the decimal point.
+# Increase the precision to safely calculate around 110+ digits
 getcontext().prec = 110
 
 def compute_pi():
-    # Chudnovsky algorithm for pi
-    getcontext().prec += 2  # Increase precision during intermediate steps.
-    C = 426880 * Decimal(10005).sqrt()
-    M = Decimal(1)
-    L = Decimal(13591409)
-    X = Decimal(1)
-    S = L
-    k = 1
-    while True:
-        M = (M * (6*k - 5) * (2*k - 1) * (6*k - 1)) / (k**3 * Decimal(640320)**3)
-        L += 545140134
-        X *= -262537412640768000
-        term = M * L / X
-        S += term
-        # Stop when the term is extremely small
-        if abs(term) < Decimal(1e-105):
-            break
+    # Chudnovsky algorithm
+    # Reference: https://en.wikipedia.org/wiki/Chudnovsky_algorithm
+    # pi = (426880 * sqrt(10005)) / sum_{k=0..∞} of (factor(k))
+    # We'll sum enough terms for ~110 digits
+    from math import factorial
+    one = Decimal(1)
+    sqrtC = Decimal(10005).sqrt()
+    pi_sum = Decimal(0)
+    k = 0
+    while k < 10:  # 10 terms is usually enough for ~100 digits
+        numerator = Decimal((factorial(6*k)) * (13591409 + 545140134*k))
+        denominator = Decimal(factorial(3*k)) * (factorial(k) ** 3) * (Decimal(-640320) ** (3*k))
+        pi_sum += numerator / denominator
         k += 1
-    pi = C / S
-    getcontext().prec -= 2  # Reset precision
-    return +pi  # Unary plus applies the new precision
+    pi = (Decimal(426880) * sqrtC) / pi_sum
+    return pi
 
 def compute_e():
-    # Compute e using its series expansion: e = sum(1/n!, n=0 to infinity)
-    e = Decimal(0)
-    fact = Decimal(1)
-    # Use more terms to ensure 100 digits precision.
-    for i in range(0, 110):
-        if i > 0:
-            fact *= i
-        e += Decimal(1) / fact
-    return e
+    # e = sum_{n=0..∞} of 1/n!
+    # We'll sum up to ~30 terms for good measure
+    from math import factorial
+    e_sum = Decimal(0)
+    for i in range(30):
+        e_sum += Decimal(1) / Decimal(factorial(i))
+    return e_sum
 
-def compute_phi():
-    # Golden ratio: phi = (1 + sqrt(5)) / 2
+def compute_golden_ratio():
+    # phi = (1 + sqrt(5)) / 2
     return (Decimal(1) + Decimal(5).sqrt()) / Decimal(2)
 
-if __name__ == '__main__':
-    pi_val = compute_pi()
-    e_val = compute_e()
-    phi_val = compute_phi()
+def first_100_digits(num_decimal):
+    # Convert to string, remove extra digits after 100 total digits
+    # We'll gather up to 101 or 102 total (to be safe),
+    # then slice. We keep the decimal point as well.
+    s = str(num_decimal)
+    # If there's a decimal point, we want up to 100 digits total (including digits before the decimal).
+    # We'll slice accordingly.
+    count = 0
+    output = []
+    for char in s:
+        if char.isdigit():
+            count += 1
+        output.append(char)
+        if count == 100:
+            break
+    return "".join(output)
 
-    # Format the output to display 100 digits after the decimal point.
-    print("First 100 digits of pi:")
-    print(format(pi_val, ".100f"))
-
-    print("\nFirst 100 digits of e:")
-    print(format(e_val, ".100f"))
-
-    print("\nFirst 100 digits of the golden ratio:")
-    print(format(phi_val, ".100f"))
+if __name__ == "__main__":
+    pi_approx = compute_pi()
+    e_approx = compute_e()
+    phi_approx = compute_golden_ratio()
+    
+    print("Pi (first 100 digits):", first_100_digits(pi_approx))
+    print("e (first 100 digits):", first_100_digits(e_approx))
+    print("Golden Ratio (first 100 digits):", first_100_digits(phi_approx))

@@ -7,6 +7,7 @@
     "circuitpython.board.version": null,
     "files.associations": {
         "*.ino": "arduino-output",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "ios": "cpp"
     }
 }

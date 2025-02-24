@@ -1,79 +1,138 @@
-; filepath: solution.asm
-; Assemble with: nasm -f macho64 solution.asm -o solution.o
-; Link with: ld solution.o -lSystem -macosx_version_min 10.7 -o solution
-; Then run: ./solution
-
-global _main
-extern _printf, _scanf
+; Assemble and link (for Linux x86_64) with:
+;   nasm -f elf64 fibonacci.asm -o fibonacci.o
+;   ld fibonacci.o -o fibonacci
+; Usage:
+;   ./fibonacci
+; This program reads a single integer (1-digit, e.g. 5) from stdin,
+; then prints the first N Fibonacci numbers (one per line).
 
 section .data
-    prompt      db "Enter number of Fibonacci numbers: ", 0
-    scanf_fmt   db "%d", 0
-    print_fmt   db "%d", 10, 0     ; "%d\n"
+prompt:     db  "Enter number of Fibonacci terms to generate (1-9): ", 0
+prompt_len: equ $-prompt
+newline:    db  10, 0
 
 section .bss
-    n   resd 1
+input:  resb  4       ; buffer for user input
+output: resb  32      ; buffer for printing numbers
 
 section .text
-_main:
-    ; Print prompt
-    lea rdi, [rel prompt]   
-    xor eax, eax           ; Number of floating point registers used = 0
-    call _printf
+global _start
 
-    ; Read integer input using scanf
-    lea rdi, [rel scanf_fmt]
-    lea rsi, [rel n]
-    xor eax, eax
-    call _scanf
+_start:
+    ;---------------------------
+    ; Write the prompt
+    ;---------------------------
+    mov rax, 1          ; sys_write
+    mov rdi, 1          ; stdout
+    mov rsi, prompt
+    mov rdx, prompt_len
+    syscall
 
-    ; Load count value into eax and ecx (loop counter)
-    mov eax, [n]
-    mov ecx, eax          ; ecx = count
-    cmp ecx, 0
-    je end_program        ; if count is 0, exit
+    ;---------------------------
+    ; Read up to 1 digit + newline
+    ;---------------------------
+    mov rax, 0          ; sys_read
+    mov rdi, 0          ; stdin
+    mov rsi, input
+    mov rdx, 2
+    syscall
 
-    ; Initialize Fibonacci values:  a = 0, b = 1
-    xor r8d, r8d          ; r8d = a = 0
-    mov r9d, 1            ; r9d = b = 1
+    ; Convert the first character of input from ASCII to number
+    mov r8b, [input]
+    sub r8b, '0'        ; e.g. if user typed '5', r8b = 5
 
-    ; Print first Fibonacci number: 0
-    lea rdi, [rel print_fmt]
-    mov rsi, r8d          ; print a (0)
-    xor eax, eax
-    call _printf
+    ; We'll store the count in r9
+    mov r9, r8
 
-    dec ecx               ; one number printed
-    cmp ecx, 0
-    je end_program
+    ; Initialize fibonacci values:
+    ; F0 = 0, F1 = 1
+    xor rax, rax        ; rax = current fib (F0)
+    mov rbx, 1          ; rbx = next fib (F1)
+    xor r10, r10        ; counter
 
-    ; Print second Fibonacci number: 1
-    lea rdi, [rel print_fmt]
-    mov rsi, r9d          ; print b (1)
-    xor eax, eax
-    call _printf
+print_fib_loop:
+    cmp r10, r9
+    jge done
 
-    dec ecx               ; two numbers printed
+    ; Print current Fibonacci number in rax
+    push r10
+    push rbx
+    call print_num
+    pop rbx
+    pop r10
 
-fib_loop:
-    ; Compute next = a + b
-    mov eax, r8d
-    add eax, r9d         ; eax = a + b
+    ; Advance to next fib
+    add rbx, rax
+    xchg rax, rbx
+    inc r10
+    jmp print_fib_loop
 
-    ; Update: a = b, b = next
-    mov r8d, r9d
-    mov r9d, eax
+done:
+    ; Exit
+    mov rax, 60         ; sys_exit
+    xor rdi, rdi
+    syscall
 
-    ; Print next Fibonacci number
-    lea rdi, [rel print_fmt]
-    mov rsi, eax
-    xor eax, eax
-    call _printf
+;--------------------------------------------------
+; print_num - prints the unsigned integer in RAX
+; followed by a newline.
+;--------------------------------------------------
+print_num:
+    push rbx
+    push rcx
+    push rdx
 
-    dec ecx
-    cmp ecx, 0
-    jne fib_loop
+    mov rdi, output     ; rdi points to buffer
+    mov rcx, 0          ; digit count
+    mov rbx, 10         ; base 10
 
-end_program:
-    xor eax, eax
+    cmp rax, 0
+    jne .convert
+    ; If RAX = 0, special case
+    mov byte [rdi], '0'
+    mov byte [rdi+1], 10    ; newline
+    mov rdx, 2
+    jmp .write_it
+
+.convert:
+    .loop:
+        xor rdx, rdx
+        div rbx         ; divide RAX by 10
+        add dl, '0'
+        mov [rdi+rcx], dl
+        inc rcx
+        cmp rax, 0
+        jne .loop
+
+    ; rcx is number of digits, reverse them
+    mov r8, 0
+    dec rcx
+    .reverse_loop:
+        cmp r8, rcx
+        jge .done_reversing
+        mov dl, [rdi+r8]
+        mov dh, [rdi+rcx]
+        mov [rdi+r8], dh
+        mov [rdi+rcx], dl
+        inc r8
+        dec rcx
+        jmp .reverse_loop
+
+    .done_reversing:
+    ; Add newline at the end
+    inc r8
+    mov byte [rdi+r8], 10
+    inc r8
+    mov rdx, r8
+
+.write_it:
+    ; Write the string in buffer
+    mov rax, 1      ; sys_write
+    mov rdi, 1      ; stdout
+    mov rsi, output
+    syscall
+
+    pop rdx
+    pop@ rcx
+    pop rbx
     ret
