@@ -1,1 +1,3 @@
-coder.practice until coder.oh_one?
+until coder.oh_one?
+    coder.practice
+  end

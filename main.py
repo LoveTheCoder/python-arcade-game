@@ -9,17 +9,18 @@ GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
 # Add paths to Python path
 sys.path.append(os.path.join(GAMES_DIR, 'GPT_o1'))
 sys.path.append(os.path.join(GAMES_DIR, 'Claude'))
+sys.path.append(os.path.join(GAMES_DIR, 'Gemini', 'Fighting'))  # Corrected path
 
 # Import the games
 from Games.GPT_o1.Bullethell import BulletHellGame
 from Games.Claude.rythmgame import main as rhythm_game_main
+from Games.Gemini.Fighting.fighting_game import FightingGame
 
 class GameMenu:
-    def __init__(self):
-        pygame.init()
+    def __init__(self, screen, clock):
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 480
-        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        self.screen = screen
         pygame.display.set_caption("Game Menu")
         
         # Colors
@@ -28,8 +29,8 @@ class GameMenu:
         self.GRAY = (128, 128, 128)
         self.SELECTED_COLOR = (0, 255, 0)
         
-        # Menu options (Exit removed)
-        self.options = ["Bullet Hell", "Rhythm Game"]
+        # Menu options
+        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]
         self.selected = 0
         
         # Font
@@ -39,6 +40,7 @@ class GameMenu:
         # Game states
         self.running = True
         self.in_menu = True
+        self.clock = clock
 
     def draw_background(self):
         # Retro styled background: vertical gradient only.
@@ -52,11 +54,9 @@ class GameMenu:
     def draw_option_graphic(self, option, rect):
         if option == "Bullet Hell":
             # Space themed graphic filling the entire rectangle.
-            # Fill with a dark starry sky (simulate with a gradient).
             for y in range(rect.top, rect.bottom):
                 intensity = 20 + int(35 * ((y - rect.top) / rect.height))
                 pygame.draw.line(self.screen, (10, 10, intensity), (rect.left, y), (rect.right, y))
-            # Draw a prominent planet filling most of the rectangle.
             planet_center = (rect.centerx, rect.centery)
             planet_radius = min(rect.width, rect.height) // 3
             pygame.draw.circle(self.screen, (100, 50, 150), planet_center, planet_radius)
@@ -64,21 +64,25 @@ class GameMenu:
         
         elif option == "Rhythm Game":
             # Vaporwave themed graphic filling the rectangle.
-            # Draw a neon grid that covers the entire rectangle.
             self.screen.fill((20, 0, 40), rect)
             num_lines = 6
             for i in range(1, num_lines):
-                # horizontal lines
                 y = rect.top + i * rect.height // num_lines
                 pygame.draw.line(self.screen, (255, 105, 180), (rect.left, y), (rect.right, y), 2)
-                # vertical lines
                 x = rect.left + i * rect.width // num_lines
                 pygame.draw.line(self.screen, (255, 105, 180), (x, rect.top), (x, rect.bottom), 2)
-            # Draw a synthetic sunset sun in the lower portion of the rectangle.
             sun_center = (rect.centerx, rect.bottom - rect.height//4)
             sun_radius = min(rect.width, rect.height) // 5
             pygame.draw.circle(self.screen, (255, 100, 100), sun_center, sun_radius)
             pygame.draw.circle(self.screen, (255, 255, 0), sun_center, sun_radius, 3)
+
+        elif option == "Fighting Game":
+            # Fighting game themed graphic filling the rectangle.
+            self.screen.fill((50, 50, 50), rect)
+            pygame.draw.rect(self.screen, (255, 0, 0), rect, 5, border_radius=10)
+            text = self.small_font.render("Fighting Game", True, self.WHITE)
+            text_rect = text.get_rect(center=(rect.centerx, rect.centery))
+            self.screen.blit(text, text_rect)
 
     def draw_menu(self):
         self.draw_background()
@@ -98,9 +102,7 @@ class GameMenu:
             pygame.draw.rect(self.screen, fill_color, rect, border_radius=10)
             border_color = self.SELECTED_COLOR if i == self.selected else self.WHITE
             pygame.draw.rect(self.screen, border_color, rect, 3, border_radius=10)
-            # Draw the option graphic over the entire rectangle.
             self.draw_option_graphic(option, rect)
-            # Overlay the option label.
             text = self.small_font.render(option, True, border_color)
             text_rect = text.get_rect(center=(rect.centerx, rect.centery))
             self.screen.blit(text, text_rect)
@@ -124,29 +126,33 @@ class GameMenu:
         return None
 
     def run(self):
-        clock = pygame.time.Clock()
+        bullet_hell_game = BulletHellGame()
+        fighting_game = FightingGame(self.screen, self.clock)
+        
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
                 if action == "Bullet Hell":
                     self.in_menu = False
-                    pygame.display.set_mode((800, 480))
-                    game = BulletHellGame()
-                    game.run()
-                    self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+                    bullet_hell_game.run()
                     self.in_menu = True
                 elif action == "Rhythm Game":
                     self.in_menu = False
-                    pygame.display.set_mode((800, 480))
                     rhythm_game_main()
-                    self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+                    self.in_menu = True
+                elif action == "Fighting Game":
+                    self.in_menu = False
+                    fighting_game.run()
                     self.in_menu = True
                 elif action == "Exit" or action == "QUIT":
                     self.running = False
-            clock.tick(60)
+            self.clock.tick(60)
         pygame.quit()
 
 if __name__ == "__main__":
-    menu = GameMenu()
+    pygame.init()
+    screen = pygame.display.set_mode((800, 480))
+    clock = pygame.time.Clock()
+    menu = GameMenu(screen, clock)
     menu.run()

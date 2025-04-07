@@ -1438,8 +1438,6 @@ def main():
                 display_game_won()
             else:
                 display_game_over()
-    clean_assets()
-    pygame.quit()
     return  # Removed sys.exit() to allow proper return to the start menu
 
 if __name__ == "__main__":
