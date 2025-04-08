@@ -205,3 +205,4 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     menu = GameMenu(screen, clock)
     menu.run()
+    #test
