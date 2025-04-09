@@ -8,12 +8,16 @@ def update_game_from_github():
     try:
         local_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
         subprocess.check_call(['git', 'fetch'])
-        remote_commit = subprocess.check_output(['git', 'rev-parse', '@{u}']).strip()
+        # Adjust the remote branch here if necessary (e.g. origin/main)
+        try:
+            remote_commit = subprocess.check_output(['git', 'rev-parse', '@{u}']).strip()
+        except subprocess.CalledProcessError:
+            # Fallback: specify remote branch explicitly (e.g. 'origin/main')
+            remote_commit = subprocess.check_output(['git', 'rev-parse', 'origin/main']).strip()
         if local_commit != remote_commit:
             print("New version available. Updating game...")
             subprocess.check_call(['git', 'pull'])
             print("Update successful. Restarting game...")
-            # Restart the game by replacing the current process with a new one
             python = sys.executable
             os.execl(python, python, *sys.argv)
         else:
@@ -21,27 +25,32 @@ def update_game_from_github():
     except Exception as e:
         print("Update failed:", e)
 
-def configure_wifi():
-    # Warning: This function overwrites your WiFi configuration file.
-    # It requires root privileges to write to /etc/wpa_supplicant/wpa_supplicant.conf.
-    ssid = input("Enter WiFi SSID: ")
-    password = input("Enter WiFi Password: ")
-    config_str = f"""ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-    update_config=1
-    country=SE
 
-    network={{
-        ssid="{ssid}"
-        psk="{password}"
-    }}
-    """
+def configure_wifi():
+    # Quit Pygame to release focus from GUI
+    pygame.quit()
     try:
+        print("Please enter WiFi credentials in the terminal.")
+        ssid = input("Enter WiFi SSID: ")
+        password = input("Enter WiFi Password: ")
+        config_str = f"""ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=SE
+
+network={{
+    ssid="{ssid}"
+    psk="{password}"
+}}
+"""
         with open("/etc/wpa_supplicant/wpa_supplicant.conf", "w") as f:
             f.write(config_str)
         subprocess.check_call(["sudo", "wpa_cli", "-i", "wlan0", "reconfigure"])
         print("WiFi reconfigured successfully!")
     except Exception as e:
         print("WiFi configuration failed:", e)
+    finally:
+        # Reinitialize Pygame after configuration is complete
+        pygame.init()
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -128,8 +137,8 @@ class GameMenu:
         self.draw_background()
         
         # Draw title with neon effect.
-        title_text = self.font.render("Game test", True, (0, 255, 255))
-        glow = self.font.render("Game test", True, (255, 20, 147))
+        title_text = self.font.render("Game Selection", True, (0, 255, 255))
+        glow = self.font.render("Game Selection", True, (255, 20, 147))
         title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH/2, 80))
         self.screen.blit(glow, (title_rect.x+2, title_rect.y+2))
         self.screen.blit(title_text, title_rect)
