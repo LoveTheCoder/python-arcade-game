@@ -4,53 +4,7 @@ import os
 import random
 import subprocess
 
-def update_game_from_github():
-    try:
-        local_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
-        subprocess.check_call(['git', 'fetch'])
-        # Adjust the remote branch here if necessary (e.g. origin/main)
-        try:
-            remote_commit = subprocess.check_output(['git', 'rev-parse', '@{u}']).strip()
-        except subprocess.CalledProcessError:
-            # Fallback: specify remote branch explicitly (e.g. 'origin/main')
-            remote_commit = subprocess.check_output(['git', 'rev-parse', 'origin/main']).strip()
-        if local_commit != remote_commit:
-            print("New version available. Updating game...")
-            subprocess.check_call(['git', 'pull'])
-            print("Update successful. Restarting game...")
-            python = sys.executable
-            os.execl(python, python, *sys.argv)
-        else:
-            print("Game is already up to date.")
-    except Exception as e:
-        print("Update failed:", e)
-
-
-def configure_wifi():
-    # Quit Pygame to release focus from GUI
-    pygame.quit()
-    try:
-        print("Please enter WiFi credentials in the terminal.")
-        ssid = input("Enter WiFi SSID: ")
-        password = input("Enter WiFi Password: ")
-        config_str = f"""ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-country=SE
-
-network={{
-    ssid="{ssid}"
-    psk="{password}"
-}}
-"""
-        with open("/etc/wpa_supplicant/wpa_supplicant.conf", "w") as f:
-            f.write(config_str)
-        subprocess.check_call(["sudo", "wpa_cli", "-i", "wlan0", "reconfigure"])
-        print("WiFi reconfigured successfully!")
-    except Exception as e:
-        print("WiFi configuration failed:", e)
-    finally:
-        # Reinitialize Pygame after configuration is complete
-        pygame.init()
+# Removed update_game_from_github and configure_wifi functions
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -156,8 +110,8 @@ class GameMenu:
             text_rect = text.get_rect(center=(rect.centerx, rect.centery))
             self.screen.blit(text, text_rect)
 
-        # Draw instructions for update and wifi configuration at the bottom.
-        instructions = self.small_font.render("Press U: Update Game    Press W: Configure WiFi", True, self.WHITE)
+        # Draw instructions for game selection.
+        instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
         instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
                 
@@ -175,10 +129,6 @@ class GameMenu:
                     self.selected = (self.selected + 1) % len(self.options)
                 elif event.key == pygame.K_RETURN:
                     return self.options[self.selected]
-                elif event.key == pygame.K_u:
-                    update_game_from_github()
-                elif event.key == pygame.K_w:
-                    configure_wifi()
                 elif event.key == pygame.K_ESCAPE:
                     return "MENU"
         return None
@@ -214,4 +164,3 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     menu = GameMenu(screen, clock)
     menu.run()
-    
