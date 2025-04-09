@@ -27,14 +27,14 @@ def configure_wifi():
     ssid = input("Enter WiFi SSID: ")
     password = input("Enter WiFi Password: ")
     config_str = f"""ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-country=US
+    update_config=1
+    country=SE
 
-network={{
-    ssid="{ssid}"
-    psk="{password}"
-}}
-"""
+    network={{
+        ssid="{ssid}"
+        psk="{password}"
+    }}
+    """
     try:
         with open("/etc/wpa_supplicant/wpa_supplicant.conf", "w") as f:
             f.write(config_str)
@@ -128,8 +128,8 @@ class GameMenu:
         self.draw_background()
         
         # Draw title with neon effect.
-        title_text = self.font.render("Game Selection", True, (0, 255, 255))
-        glow = self.font.render("Game Selection", True, (255, 20, 147))
+        title_text = self.font.render("Game test", True, (0, 255, 255))
+        glow = self.font.render("Game test", True, (255, 20, 147))
         title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH/2, 80))
         self.screen.blit(glow, (title_rect.x+2, title_rect.y+2))
         self.screen.blit(title_text, title_rect)
@@ -205,4 +205,4 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
     menu = GameMenu(screen, clock)
     menu.run()
-    #test
+    
