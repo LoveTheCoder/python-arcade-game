@@ -1187,7 +1187,7 @@ def start_menu(screen, font, clock):
         clock.tick(FPS)
 
 class BulletHellGame:
-    def __init__(self):
+    def __init__(self, gpio_buttons=None):
         self.running = True
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Bullet Hell")
