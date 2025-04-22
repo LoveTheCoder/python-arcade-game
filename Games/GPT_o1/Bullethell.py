@@ -11,10 +11,10 @@ import atexit
 gpio_initialized = False
 
 if not gpio_initialized:
-    button_up = Button(4)
-    button_down = Button(2)
-    button_left = Button(3)
-    button_right = Button(5)
+    button_up = Button(6)
+    button_down = Button(7)
+    button_left = Button(8)
+    button_right = Button(9)
     gpio_initialized = True
 
 #test
