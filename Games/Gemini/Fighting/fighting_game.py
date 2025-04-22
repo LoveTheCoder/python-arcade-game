@@ -274,6 +274,11 @@ class FightingGame:
         self.button_down = None
         self.button_left = None
         self.button_right = None
+        self.button_esc = None
+        self.button_select = None
+        self.button_punch = None
+        self.button_kick = None
+        self.button_block = None
 
         self.running = False  # Initialize running flag
 
@@ -329,20 +334,51 @@ class FightingGame:
         self.current_background = None
 
     def initialize_gpio(self):
-        self.button_up = Button(4)    # GPIO pin 4 for "Up"
-        self.button_down = Button(2)  # GPIO pin 2 for "Down"
-        self.button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
-        self.button_right = Button(5) # GPIO pin 5 for "Right" (Enter/Select)
+        try:
+            # Joystick controls
+            self.button_up = Button(4)       # GPIO pin 4 for "Up"
+            self.button_down = Button(2)     # GPIO pin 2 for "Down"
+            self.button_left = Button(3)     # GPIO pin 3 for "Left"
+            self.button_right = Button(5)    # GPIO pin 5 for "Right"
+            
+            # Additional buttons
+            self.button_esc = Button(6)      # GPIO pin 6 for "ESC"
+            self.button_select = Button(7)   # GPIO pin 7 for "Select"
+            self.button_punch = Button(8)    # GPIO pin 8 for "Punch"
+            self.button_kick = Button(9)     # GPIO pin 9 for "Kick"
+            self.button_block = Button(10)   # GPIO pin 10 for "Block/Dodge"
+            
+            print("Fighting Game GPIO initialized.")
+        except Exception as e:
+            print(f"Error initializing Fighting Game GPIO: {e}")
 
     def cleanup_gpio(self):
-        if self.button_up:
-            self.button_up.close()
-        if self.button_down:
-            self.button_down.close()
-        if self.button_left:
-            self.button_left.close()
-        if self.button_right:
-            self.button_right.close()
+        try:
+            # Close joystick buttons
+            if hasattr(self, 'button_up'):
+                self.button_up.close()
+            if hasattr(self, 'button_down'):
+                self.button_down.close()
+            if hasattr(self, 'button_left'):
+                self.button_left.close()
+            if hasattr(self, 'button_right'):
+                self.button_right.close()
+                
+            # Close additional buttons
+            if hasattr(self, 'button_esc'):
+                self.button_esc.close()
+            if hasattr(self, 'button_select'):
+                self.button_select.close()
+            if hasattr(self, 'button_punch'):
+                self.button_punch.close()
+            if hasattr(self, 'button_kick'):
+                self.button_kick.close()
+            if hasattr(self, 'button_block'):
+                self.button_block.close()
+                
+            print("Fighting Game GPIO cleaned up.")
+        except Exception as e:
+            print(f"Error cleaning up Fighting Game GPIO: {e}")
 
     def initialize_game_session(self, level):
         """Sets up player, opponent, and background for the selected level."""
@@ -538,23 +574,28 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"  # Signal exit
-            if event.type == pygame.KEYDOWN:
-                if self.button_up.is_pressed:
-                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif self.button_down.is_pressed:
-                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-                elif event.key == pygame.K_RETURN:
-                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
-                        self.game_state = STATE_LEVEL_SELECT
-                        self.selected_level = 1  # Reset level selection
-                    elif self.selected_start_option == 1:  # Attack List
-                        self.game_state = STATE_ATTACK_LIST
-                    elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
-                        self.running = False  # Stop this game's loop
-                        return "QUIT"  # Signal exit from this game instance
-                elif event.key == pygame.K_ESCAPE:  # Allow ESC to exit from this game's menu
-                    self.running = False
-                    return "QUIT"
+                
+        # Check GPIO buttons for menu navigation        
+        if hasattr(self, 'button_up') and self.button_up.is_pressed:
+            self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_down') and self.button_down.is_pressed:
+            self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_select') and self.button_select.is_pressed:  # SELECT button to confirm
+            if self.selected_start_option == 0:  # Start Game -> Go to Level Select
+                self.game_state = STATE_LEVEL_SELECT
+                self.selected_level = 1  # Reset level selection
+            elif self.selected_start_option == 1:  # Attack List
+                self.game_state = STATE_ATTACK_LIST
+            elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
+                self.running = False  # Stop this game's loop
+                return "QUIT"  # Signal exit from this game instance
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_esc') and self.button_esc.is_pressed:  # ESC button to exit
+            self.running = False
+            return "QUIT"
+            
         return None  # No action taken this frame
 
     def handle_level_select_input(self):
@@ -564,21 +605,29 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.game_state = STATE_START_MENU
-                    return None
-                elif event.key == pygame.K_RETURN:
-                    self.initialize_game_session(self.selected_level)
-                    return None # Stay in game loop, state changed
-                elif self.button_up.is_pressed:
-                    self.selected_level = (self.selected_level - 1) % total_options
-                elif self.button_down.is_pressed:
-                    self.selected_level = (self.selected_level + 1) % total_options
-                elif self.button_left.is_pressed:
-                    self.selected_level = max(0, self.selected_level - 1)
-                elif self.button_right.is_pressed:
-                    self.selected_level = min(total_options - 1, self.selected_level + 1)
+                
+        # Check GPIO buttons for level selection
+        if hasattr(self, 'button_esc') and self.button_esc.is_pressed:  # ESC to return to menu
+            self.game_state = STATE_START_MENU
+            pygame.time.wait(200)  # Debounce
+            return None
+        elif hasattr(self, 'button_select') and self.button_select.is_pressed:  # SELECT to confirm level
+            self.initialize_game_session(self.selected_level)
+            pygame.time.wait(200)  # Debounce
+            return None  # Stay in game loop, state changed
+        elif hasattr(self, 'button_up') and self.button_up.is_pressed:
+            self.selected_level = (self.selected_level - 1) % total_options
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_down') and self.button_down.is_pressed:
+            self.selected_level = (self.selected_level + 1) % total_options
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_left') and self.button_left.is_pressed:
+            self.selected_level = max(0, self.selected_level - 1)
+            pygame.time.wait(200)  # Debounce
+        elif hasattr(self, 'button_right') and self.button_right.is_pressed:
+            self.selected_level = min(total_options - 1, self.selected_level + 1)
+            pygame.time.wait(200)  # Debounce
+            
         return None
 
     def handle_game_over_input(self):
@@ -587,11 +636,13 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    self.reset_game_state() # Go back to the main menu
-                elif event.key == pygame.K_ESCAPE: # Also allow ESC to go back
-                     self.reset_game_state()
+                
+        # Check GPIO buttons for game over screen
+        if (hasattr(self, 'button_select') and self.button_select.is_pressed) or \
+           (hasattr(self, 'button_esc') and self.button_esc.is_pressed):
+            self.reset_game_state()  # Go back to the main menu
+            pygame.time.wait(200)  # Debounce
+            
         return None
 
     def handle_input(self):
@@ -605,49 +656,40 @@ class FightingGame:
                 return "QUIT"
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if event.key == pygame.K_ESCAPE or (hasattr(self, 'button_esc') and self.button_esc.is_pressed):
                     self.game_state = STATE_PAUSED
                     self.selected_pause_option = 0
                     return None
 
                 # Actions triggered on key press
                 if self.player:
-                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if self.button_up.is_pressed:
-                        self.player._add_direction_to_buffer('up')
-                        self.player.jump() # Still trigger jump action
-                    elif self.button_down.is_pressed:
-                        self.player._add_direction_to_buffer('down')
-                        self.player.crouch() # Still trigger crouch action
-                    elif self.button_left.is_pressed:
-                         self.player._add_direction_to_buffer('left')
-                         # Movement itself is handled by get_pressed below
-                    elif self.button_right.is_pressed:
-                         self.player._add_direction_to_buffer('right')
-                         # Movement itself is handled by get_pressed below
-                    # --- End Buffer Input ---
+                    # ... keyboard handling ...
+                    pass
 
-                    # Attack / Dodge Inputs
-                    elif event.key == pygame.K_q: # Punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif event.key == pygame.K_e: # Kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif event.key == pygame.K_SPACE:
-                        self.player.dodge() # Dodge action
-
-            if event.type == pygame.KEYUP:
-                # Stop crouching when DOWN key is released
-                if self.player and self.button_down.is_pressed:
-                    self.player.stand()
-
-        # --- Continuous Movement (outside event loop, uses get_pressed) ---
-        # This block now ONLY handles the actual movement, not buffer input
-        if self.player and self.game_state == STATE_GAME_RUNNING:
-            keys = pygame.key.get_pressed()
-            if self.button_left.is_pressed:
-                self.player.move_left() # Call movement method
-            if self.button_right.is_pressed:
-                self.player.move_right() # Call movement method
+        # Check GPIO buttons for movement and attacks
+        if self.player and hasattr(self, 'button_up'):
+            # --- Movement inputs ---
+            # Add directional inputs to buffer based on joystick
+            if self.button_up.is_pressed:
+                self.player._add_direction_to_buffer('up')
+                self.player.jump()  # Trigger jump action
+            elif self.button_down.is_pressed:
+                self.player._add_direction_to_buffer('down')
+                self.player.crouch()  # Trigger crouch action
+            elif self.button_left.is_pressed:
+                self.player._add_direction_to_buffer('left')
+                self.player.move_left()  # Call movement method
+            elif self.button_right.is_pressed:
+                self.player._add_direction_to_buffer('right')
+                self.player.move_right()  # Call movement method
+                
+            # --- Attack inputs ---
+            if self.button_punch.is_pressed:  # Punch with button on pin 8
+                performed_attack_type = self.player.attack("punch")
+            elif self.button_kick.is_pressed:  # Kick with button on pin 9
+                performed_attack_type = self.player.attack("kick")
+            elif self.button_block.is_pressed:  # Block/Dodge with button on pin 10
+                self.player.dodge()
 
         # --- Process Attack (if any was performed) ---
         if performed_attack_type and self.opponent:

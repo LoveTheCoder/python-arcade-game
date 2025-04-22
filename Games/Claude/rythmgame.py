@@ -510,10 +510,17 @@ def main():
     gpio_buttons = None
     try:
         gpio_buttons = {
+            # Joystick controls
             "button_up": Button(4),
             "button_down": Button(2),
             "button_left": Button(3),
-            "button_right": Button(5)
+            "button_right": Button(5),
+            # Additional buttons
+            "button_esc": Button(6),      # ESC button
+            "button_select": Button(7),   # SELECT button
+            "button_action1": Button(8),  # Action button 1
+            "button_action2": Button(9),  # Action button 2
+            "button_action3": Button(10)  # Action button 3
         }
         print("Rhythm Game GPIO initialized.")
     except GPIOZeroError as e:
@@ -529,6 +536,11 @@ def main():
                 gpio_buttons["button_down"].close()
                 gpio_buttons["button_left"].close()
                 gpio_buttons["button_right"].close()
+                gpio_buttons["button_esc"].close()
+                gpio_buttons["button_select"].close()
+                gpio_buttons["button_action1"].close()
+                gpio_buttons["button_action2"].close()
+                gpio_buttons["button_action3"].close()
                 print("Rhythm Game GPIO cleaned up.")
             except Exception as e:
                 print(f"Error cleaning up Rhythm Game GPIO: {e}")
@@ -547,6 +559,65 @@ def main():
         
         running = True
         while running:
+            if gpio_buttons:
+                if game_state.current_state == STATE_PLAY:
+                    if gpio_buttons["button_left"].is_pressed:
+                        handle_note_hit(KEY_MAP[pygame.K_d], game_state, game_state.notes, game_state.score_tracker)
+                    if gpio_buttons["button_down"].is_pressed:
+                        handle_note_hit(KEY_MAP[pygame.K_f], game_state, game_state.notes, game_state.score_tracker)
+                    if gpio_buttons["button_action1"].is_pressed:
+                        handle_note_hit(KEY_MAP[pygame.K_j], game_state, game_state.notes, game_state.score_tracker)
+                    if gpio_buttons["button_action2"].is_pressed:
+                        handle_note_hit(KEY_MAP[pygame.K_k], game_state, game_state.notes, game_state.score_tracker)
+                    if gpio_buttons["button_esc"].is_pressed:
+                        game_state.current_state = STATE_PAUSE
+                        game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
+                        game_state.music.stop()
+                        pygame.time.wait(200)
+                elif game_state.current_state == STATE_MENU:
+                    if gpio_buttons["button_up"].is_pressed:
+                        if game_state.selected_menu_item == 0:
+                            game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
+                        elif game_state.selected_menu_item == 1:
+                            game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
+                        pygame.time.wait(200)
+                    elif gpio_buttons["button_down"].is_pressed:
+                        if game_state.selected_menu_item == 0:
+                            game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
+                        elif game_state.selected_menu_item == 1:
+                            game_state.selected_difficulty = (game_state.selected_difficulty + 1) % len(game_state.difficulties)
+                        pygame.time.wait(200)
+                    elif gpio_buttons["button_select"].is_pressed:
+                        if game_state.selected_menu_item == 3:
+                            running = False
+                        else:
+                            game_state.current_song = SONGS[game_state.selected_song_index]
+                            melody = game_state.current_song.melody_func()
+                            game_state.music, duration, _ = generate_music(melody)
+                            start_song(game_state)
+                        pygame.time.wait(200)
+                elif game_state.current_state == STATE_PAUSE:
+                    if gpio_buttons["button_up"].is_pressed:
+                        game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
+                        pygame.time.wait(200)
+                    elif gpio_buttons["button_down"].is_pressed:
+                        game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
+                        pygame.time.wait(200)
+                    elif gpio_buttons["button_select"].is_pressed:
+                        if game_state.selected_pause_option == 0:
+                            start_song(game_state)
+                        elif game_state.selected_pause_option == 1:
+                            game_state.current_state = STATE_MENU
+                            game_state.notes.empty()
+                            game_state.score_tracker.reset()
+                            game_state.music.stop()
+                        pygame.time.wait(200)
+                elif game_state.current_state == STATE_RESULTS:
+                    if gpio_buttons["button_select"].is_pressed:
+                        game_state.current_state = STATE_MENU
+                        game_state.song_finished = False
+                        pygame.time.wait(200)
+
             events = pygame.event.get()
             for event in events:
                 if event.type == pygame.QUIT:

@@ -55,10 +55,17 @@ class GameMenu:
         if self.gpio_buttons is None:  # Only initialize if not already done
             try:
                 self.gpio_buttons = {
+                    # Joystick buttons
                     "button_up": Button(4),
                     "button_down": Button(2),
-                    "button_left": Button(3),  # Use left for back/exit confirmation
-                    "button_right": Button(5)  # Use right for select
+                    "button_left": Button(3),
+                    "button_right": Button(5),
+                    # Additional buttons
+                    "button_esc": Button(6),      # New ESC button
+                    "button_select": Button(7),   # New Select button
+                    "button_action1": Button(8),  # New Action button 1
+                    "button_action2": Button(9),  # New Action button 2
+                    "button_action3": Button(10)  # New Action button 3
                 }
                 print("Menu GPIO initialized.")
             except GPIOZeroError as e:
@@ -73,10 +80,17 @@ class GameMenu:
         if self.gpio_buttons:
             try:
                 print("Cleaning up menu GPIO...")
+                # Close joystick buttons
                 self.gpio_buttons["button_up"].close()
                 self.gpio_buttons["button_down"].close()
                 self.gpio_buttons["button_left"].close()
                 self.gpio_buttons["button_right"].close()
+                # Close additional buttons
+                self.gpio_buttons["button_esc"].close()
+                self.gpio_buttons["button_select"].close()
+                self.gpio_buttons["button_action1"].close()
+                self.gpio_buttons["button_action2"].close()
+                self.gpio_buttons["button_action3"].close()
                 print("Menu GPIO cleaned up.")
             except Exception as e:
                 print(f"Error cleaning up menu GPIO: {e}")
@@ -148,7 +162,7 @@ class GameMenu:
             self.screen.blit(text, text_rect)
 
         # Draw instructions for game selection.
-        instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
+        instructions = self.small_font.render("Press UP/DOWN to select, SELECT to start", True, self.WHITE)
         instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
                 
@@ -165,12 +179,12 @@ class GameMenu:
             elif self.gpio_buttons["button_down"].is_pressed:
                 self.selected = (self.selected + 1) % len(self.options)
                 pygame.time.wait(200)  # Debounce delay
-            elif self.gpio_buttons["button_right"].is_pressed:  # Right selects
+            elif self.gpio_buttons["button_select"].is_pressed:  # Use SELECT button instead of RIGHT
                 pygame.time.wait(200)  # Debounce
                 return self.options[self.selected]
-            elif self.gpio_buttons["button_left"].is_pressed:  # Left goes back/exits menu
+            elif self.gpio_buttons["button_esc"].is_pressed:  # ESC button to exit
                 pygame.time.wait(200)  # Debounce
-                return "Exit"  # Example: Left exits the whole app from menu
+                return "Exit"  # Exit the whole app from menu
 
         # Always check for Pygame events (QUIT, Keyboard fallback)
         for event in pygame.event.get():

@@ -367,6 +367,7 @@ class Player(pygame.sprite.Sprite):
         else:
             self.base_speed = 5  # Reset to base speed
         
+        # Use joystick buttons for movement
         if game.gpio_buttons["button_left"].is_pressed:
             self.speedx = -self.base_speed
         if game.gpio_buttons["button_right"].is_pressed:
@@ -389,8 +390,8 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom > SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
-        # Shooting
-        if key_state[pygame.K_z]:
+        # Shooting - use action button 1 (GPIO 8)
+        if game.gpio_buttons["button_action1"].is_pressed or key_state[pygame.K_z]:
             self.shoot()
 
     def shoot(self):
@@ -1039,17 +1040,24 @@ def start_menu(screen, font, clock):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if game.gpio_buttons["button_up"].is_pressed:
-                    selected = (selected - 1) % len(options)
-                elif game.gpio_buttons["button_down"].is_pressed:
-                    selected = (selected + 1) % len(options)
-                elif event.key == pygame.K_RETURN:
-                    return options[selected]
-        # Draw static menu background
-        draw_menu_background(screen)
-        
+                
+        # Navigation using GPIO buttons
+        if game.gpio_buttons["button_up"].is_pressed:
+            selected = (selected - 1) % len(options)
+            pygame.time.wait(200)  # Debounce
+        elif game.gpio_buttons["button_down"].is_pressed:
+            selected = (selected + 1) % len(options)
+            pygame.time.wait(200)  # Debounce
+        elif game.gpio_buttons["button_select"].is_pressed:  # Use select button
+            pygame.time.wait(200)  # Debounce
+            return options[selected]
+        elif game.gpio_buttons["button_esc"].is_pressed:  # ESC to return to main menu
+            pygame.time.wait(200)  # Debounce
+            return "Return to Main Menu"
+            
+        # Draw rest of the menu
         # Add a semi-transparent overlay for a cyberpunk effect
+        draw_menu_background(screen)
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(100)
         overlay.fill((10, 10, 40))
@@ -1091,18 +1099,32 @@ class BulletHellGame:
 
     def initialize_gpio(self):
         self.gpio_buttons = {
+            # Joystick controls
             "button_up": Button(4),
             "button_down": Button(2),
             "button_left": Button(3),
-            "button_right": Button(5)
+            "button_right": Button(5),
+            # Additional buttons
+            "button_esc": Button(6),      # ESC button for pausing/menus
+            "button_select": Button(7),   # SELECT button for confirming
+            "button_action1": Button(8),  # Action button 1 (shoot)
+            "button_action2": Button(9),  # Action button 2
+            "button_action3": Button(10)  # Action button 3
         }
 
     def cleanup_gpio(self):
         if self.gpio_buttons:
+            # Close joystick buttons
             self.gpio_buttons["button_up"].close()
             self.gpio_buttons["button_down"].close()
             self.gpio_buttons["button_left"].close()
             self.gpio_buttons["button_right"].close()
+            # Close additional buttons
+            self.gpio_buttons["button_esc"].close()
+            self.gpio_buttons["button_select"].close()
+            self.gpio_buttons["button_action1"].close()
+            self.gpio_buttons["button_action2"].close()
+            self.gpio_buttons["button_action3"].close()
 
     def init_game(self):
         global player, all_sprites, bullets, enemy_bullets, enemies, bosses, power_points, points
@@ -1119,6 +1141,11 @@ class BulletHellGame:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
+
+        # Also check for ESC button press for pausing
+        if self.gpio_buttons and self.gpio_buttons["button_esc"].is_pressed:
+            # Handle pause menu activation
+            return "pause"
 
     def run(self):
         self.initialize_gpio()
