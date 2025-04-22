@@ -5,8 +5,6 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
-from gpiozero import Button, GPIOZeroError
-import atexit
 
 # Add Game States
 STATE_START_MENU = 0
@@ -16,45 +14,6 @@ STATE_GAME_RUNNING = 3
 STATE_PAUSED = 4
 STATE_GAME_OVER_WIN = 5  # New state
 STATE_GAME_OVER_LOSE = 6  # New state
-
-# Initialize GPIO buttons
-def initialize_gpio():
-    try:
-        gpio_buttons = {
-            # Directional buttons
-            "button_up": Button(4),
-            "button_down": Button(2),
-            "button_left": Button(3),
-            "button_right": Button(5),
-            # Menu buttons
-            "button_esc": Button(6),
-            "button_select": Button(7),
-            # Action buttons
-            "button_action1": Button(8),  # Primary action (shoot/hit/select)
-            "button_action2": Button(9),  # Secondary action
-            "button_action3": Button(10)  # Tertiary action
-        }
-        print("GPIO buttons initialized")
-        return gpio_buttons
-    except GPIOZeroError as e:
-        print(f"GPIO Error: {e}. Falling back to keyboard controls.")
-        return None
-    except Exception as e:
-        print(f"Unexpected error initializing GPIO: {e}")
-        return None
-
-# Cleanup GPIO
-def cleanup_gpio(gpio_buttons):
-    if gpio_buttons:
-        try:
-            for button_name, button in gpio_buttons.items():
-                button.close()
-            print("GPIO cleaned up")
-        except Exception as e:
-            print(f"Error cleaning up GPIO: {e}")
-
-# Register cleanup at exit
-atexit.register(cleanup_gpio)
 
 # --- Background Generation Function ---
 def generate_level_background(level, width, height, floor_level):
@@ -612,58 +571,62 @@ class FightingGame:
     def handle_input(self):
         """Handles player input during the game running state."""
         performed_attack_type = None
-        
-        # Process pygame events first
+
+        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game_state = STATE_PAUSED
                     self.selected_pause_option = 0
                     return None
-        
-        # Process GPIO inputs for the player
-        if self.player:
-            try:
-                # Movement controls
-                if hasattr(self, 'button_up') and self.button_up and self.button_up.is_pressed:
-                    self.player._add_direction_to_buffer('up')
-                    self.player.jump()
-                if hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed:
-                    self.player._add_direction_to_buffer('down')
-                    self.player.crouch()
-                elif not (hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed):
-                    self.player.stand()  # Release crouch if button not pressed
-                    
-                if hasattr(self, 'button_left') and self.button_left and self.button_left.is_pressed:
-                    self.player._add_direction_to_buffer('left')
-                    self.player.move_left()
-                if hasattr(self, 'button_right') and self.button_right and self.button_right.is_pressed:
-                    self.player._add_direction_to_buffer('right')
-                    self.player.move_right()
-                
-                # Action buttons
-                if hasattr(self, 'button_punch') and self.button_punch and self.button_punch.is_pressed:
-                    performed_attack_type = self.player.attack("punch")
-                if hasattr(self, 'button_kick') and self.button_kick and self.button_kick.is_pressed:
-                    performed_attack_type = self.player.attack("kick")
-                if hasattr(self, 'button_block') and self.button_block and self.button_block.is_pressed:
-                    self.player.dodge()
-                if hasattr(self, 'button_esc') and self.button_esc and self.button_esc.is_pressed:
-                    self.game_state = STATE_PAUSED
-                    self.selected_pause_option = 0
-                    pygame.time.wait(200)  # Debounce
-                    return None
-                    
-            except Exception as e:
-                print(f"GPIO input error: {e}")
-        
-        # Process attack if performed
+
+                # Actions triggered on key press
+                if self.player:
+                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
+                    if event.key == pygame.K_UP:
+                        self.player._add_direction_to_buffer('up')
+                        self.player.jump() # Still trigger jump action
+                    elif event.key == pygame.K_DOWN:
+                        self.player._add_direction_to_buffer('down')
+                        self.player.crouch() # Still trigger crouch action
+                    elif event.key == pygame.K_LEFT:
+                         self.player._add_direction_to_buffer('left')
+                         # Movement itself is handled by get_pressed below
+                    elif event.key == pygame.K_RIGHT:
+                         self.player._add_direction_to_buffer('right')
+                         # Movement itself is handled by get_pressed below
+                    # --- End Buffer Input ---
+
+                    # Attack / Dodge Inputs
+                    elif event.key == pygame.K_q: # Punch
+                        performed_attack_type = self.player.attack("punch")
+                    elif event.key == pygame.K_e: # Kick
+                        performed_attack_type = self.player.attack("kick")
+                    elif event.key == pygame.K_SPACE:
+                        self.player.dodge() # Dodge action
+
+            if event.type == pygame.KEYUP:
+                # Stop crouching when DOWN key is released
+                if self.player and event.key == pygame.K_DOWN:
+                    self.player.stand()
+
+        # --- Continuous Movement (outside event loop, uses get_pressed) ---
+        # This block now ONLY handles the actual movement, not buffer input
+        if self.player and self.game_state == STATE_GAME_RUNNING:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.player.move_left() # Call movement method
+            if keys[pygame.K_RIGHT]:
+                self.player.move_right() # Call movement method
+
+        # --- Process Attack (if any was performed) ---
         if performed_attack_type and self.opponent:
             self.handle_attack(self.player, self.opponent, performed_attack_type)
-        
+
         return None
 
     def handle_attack(self, attacker, defender, attack_name):

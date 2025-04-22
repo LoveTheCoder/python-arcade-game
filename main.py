@@ -3,8 +3,6 @@ import sys
 import os
 import random
 import subprocess
-from gpiozero import Button, GPIOZeroError
-import atexit
 
 # Removed update_game_from_github and configure_wifi functions
 
@@ -20,45 +18,6 @@ sys.path.append(os.path.join(GAMES_DIR, 'Gemini', 'Fighting'))  # Corrected path
 from Games.GPT_o1.Bullethell import BulletHellGame
 from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
-
-# Initialize GPIO buttons
-def initialize_gpio():
-    try:
-        gpio_buttons = {
-            # Directional buttons
-            "button_up": Button(4),
-            "button_down": Button(2),
-            "button_left": Button(3),
-            "button_right": Button(5),
-            # Menu buttons
-            "button_esc": Button(6),
-            "button_select": Button(7),
-            # Action buttons
-            "button_action1": Button(8),  # Primary action (shoot/hit/select)
-            "button_action2": Button(9),  # Secondary action
-            "button_action3": Button(10)  # Tertiary action
-        }
-        print("GPIO buttons initialized")
-        return gpio_buttons
-    except GPIOZeroError as e:
-        print(f"GPIO Error: {e}. Falling back to keyboard controls.")
-        return None
-    except Exception as e:
-        print(f"Unexpected error initializing GPIO: {e}")
-        return None
-
-# Cleanup GPIO
-def cleanup_gpio(gpio_buttons):
-    if gpio_buttons:
-        try:
-            for button_name, button in gpio_buttons.items():
-                button.close()
-            print("GPIO cleaned up")
-        except Exception as e:
-            print(f"Error cleaning up GPIO: {e}")
-
-# Register cleanup at exit
-atexit.register(cleanup_gpio)
 
 class GameMenu:
     def __init__(self, screen, clock):
@@ -203,7 +162,5 @@ if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((800, 480))
     clock = pygame.time.Clock()
-    gpio_buttons = initialize_gpio()
     menu = GameMenu(screen, clock)
     menu.run()
-    cleanup_gpio(gpio_buttons)

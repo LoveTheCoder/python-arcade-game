@@ -4,8 +4,6 @@ import random
 import numpy as np
 import json
 import math
-from gpiozero import Button, GPIOZeroError
-import atexit
 
 running = True
 
@@ -28,45 +26,6 @@ def default_config():
             'right': pygame.K_k
         }
     }
-
-# Initialize GPIO buttons
-def initialize_gpio():
-    try:
-        gpio_buttons = {
-            # Directional buttons
-            "button_up": Button(4),
-            "button_down": Button(2),
-            "button_left": Button(3),
-            "button_right": Button(5),
-            # Menu buttons
-            "button_esc": Button(6),
-            "button_select": Button(7),
-            # Action buttons
-            "button_action1": Button(8),  # Primary action (shoot/hit/select)
-            "button_action2": Button(9),  # Secondary action
-            "button_action3": Button(10)  # Tertiary action
-        }
-        print("GPIO buttons initialized")
-        return gpio_buttons
-    except GPIOZeroError as e:
-        print(f"GPIO Error: {e}. Falling back to keyboard controls.")
-        return None
-    except Exception as e:
-        print(f"Unexpected error initializing GPIO: {e}")
-        return None
-
-# Cleanup GPIO
-def cleanup_gpio(gpio_buttons):
-    if gpio_buttons:
-        try:
-            for button_name, button in gpio_buttons.items():
-                button.close()
-            print("GPIO cleaned up")
-        except Exception as e:
-            print(f"Error cleaning up GPIO: {e}")
-
-# Register cleanup at exit
-atexit.register(cleanup_gpio)
 
 # Constants
 WIDTH, HEIGHT = 800, 480  # New dimensions
@@ -615,8 +574,6 @@ def main():
     game_state = GameState(resources)
     menu_font = pygame.font.Font(None, 36)
     
-    gpio_buttons = initialize_gpio()
-    
     running = True
     while running:
         events = pygame.event.get()
@@ -692,16 +649,6 @@ def main():
                 current_time >= duration * 1000):
                 game_state.current_state = STATE_RESULTS
                 game_state.song_finished = True
-            
-            # Handle GPIO button presses
-            if gpio_buttons and gpio_buttons["button_left"].is_pressed:
-                handle_note_hit(KEY_MAP[pygame.K_d], game_state, game_state.notes, game_state.score_tracker)
-            if gpio_buttons and gpio_buttons["button_down"].is_pressed:
-                handle_note_hit(KEY_MAP[pygame.K_f], game_state, game_state.notes, game_state.score_tracker)
-            if gpio_buttons and gpio_buttons["button_action1"].is_pressed:
-                handle_note_hit(KEY_MAP[pygame.K_j], game_state, game_state.notes, game_state.score_tracker)
-            if gpio_buttons and gpio_buttons["button_action2"].is_pressed:
-                handle_note_hit(KEY_MAP[pygame.K_k], game_state, game_state.notes, game_state.score_tracker)
         
         elif game_state.current_state == STATE_RESULTS:
             if event.type == pygame.KEYDOWN:
