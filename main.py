@@ -3,6 +3,7 @@ import sys
 import os
 import random
 import subprocess
+import atexit
 
 # Try to import gpiozero; if not available, ignore GPIO input.
 try:
@@ -22,6 +23,16 @@ sys.path.append(os.path.join(GAMES_DIR, 'Gemini', 'Fighting'))  # Corrected path
 from Games.GPT_o1.Bullethell import BulletHellGame, set_gpio_buttons
 from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
+
+def close_gpio_buttons(gpio_buttons):
+    if gpio_buttons:
+        for name, button in gpio_buttons.items():
+            button.close()
+        print("Main: GPIO buttons closed.")
+    return None
+
+# Register exit cleanup even for menu buttons
+atexit.register(lambda: close_gpio_buttons(globals().get('gpio_buttons', None)))
 
 class GameMenu:
     def __init__(self, screen, clock, gpio_buttons=None):
@@ -163,25 +174,57 @@ class GameMenu:
         return None
 
     def run(self):
-        bullet_hell_game = BulletHellGame(gpio_buttons=self.gpio_buttons)
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
-                if action == "Bullet Hell":
-                    self.in_menu = False
-                    bullet_hell_game.run()
-                    self.in_menu = True
-                elif action == "Rhythm Game":
-                    self.in_menu = False
-                    rhythm_game_main()
-                    self.in_menu = True
-                elif action == "Fighting Game":
-                    self.in_menu = False
-                    fighting_game = FightingGame(self.screen, self.clock)
-                    fighting_game.run()
-                    self.in_menu = True
-                elif action == "Exit" or action == "QUIT" or action == "MENU":
+                if action in ("Bullet Hell", "Rhythm Game", "Fighting Game"):
+                    # Close current menu GPIO before launching game
+                    self.gpio_buttons = close_gpio_buttons(self.gpio_buttons)
+                    if action == "Bullet Hell":
+                        # Reinitialize a new set for the game module (if available)
+                        new_gpio = None
+                        if Button:
+                            try:
+                                new_gpio = {
+                                    'up': Button(4, pull_up=True, bounce_time=0.1),
+                                    'down': Button(2, pull_up=True, bounce_time=0.1),
+                                    'left': Button(3, pull_up=True, bounce_time=0.1),
+                                    'right': Button(5, pull_up=True, bounce_time=0.1),
+                                    'esc': Button(6, pull_up=True, bounce_time=0.1),
+                                    'select': Button(7, pull_up=True, bounce_time=0.1),
+                                    'action1': Button(8, pull_up=True, bounce_time=0.1),
+                                    'action2': Button(9, pull_up=True, bounce_time=0.1),
+                                    'action3': Button(10, pull_up=True, bounce_time=0.1)
+                                }
+                                print("Main: New GPIO buttons reinitialized for the game.")
+                            except Exception as e:
+                                print(f"Error reinitializing GPIO for game: {e}")
+                        # Launch chosen game passing the fresh instance
+                        if action == "Bullet Hell":
+                            bullet_hell_game = BulletHellGame(gpio_buttons=new_gpio)
+                            self.in_menu = False
+                            bullet_hell_game.run()
+                            self.in_menu = True
+                    # (Add similar blocks if launching other games)
+                    # Reinitialize menu GPIO after returning from a game
+                    if Button:
+                        try:
+                            self.gpio_buttons = {
+                                'up': Button(4, pull_up=True, bounce_time=0.1),
+                                'down': Button(2, pull_up=True, bounce_time=0.1),
+                                'left': Button(3, pull_up=True, bounce_time=0.1),
+                                'right': Button(5, pull_up=True, bounce_time=0.1),
+                                'esc': Button(6, pull_up=True, bounce_time=0.1),
+                                'select': Button(7, pull_up=True, bounce_time=0.1),
+                                'action1': Button(8, pull_up=True, bounce_time=0.1),
+                                'action2': Button(9, pull_up=True, bounce_time=0.1),
+                                'action3': Button(10, pull_up=True, bounce_time=0.1)
+                            }
+                            print("Main: Menu GPIO reinitialized after game exit.")
+                        except Exception as e:
+                            print(f"Error reinitializing menu GPIO: {e}")
+                elif action in ("Exit", "QUIT", "MENU"):
                     self.running = False
                 self.clock.tick(60)
         pygame.quit()
