@@ -138,14 +138,28 @@ class GameMenu:
         return None
 
     def run(self):
-        bullet_hell_game = BulletHellGame()  # if these work correctly
+        bullet_hell_game = BulletHellGame()  # Initialize the BulletHellGame instance
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
                 if action == "Bullet Hell":
+                    # Release GPIO pins used by the main menu
+                    button_up.close()
+                    button_down.close()
+                    button_left.close()
+                    button_right.close()
+
                     self.in_menu = False
                     bullet_hell_game.run()
+
+                    # Reinitialize GPIO pins for the main menu after the game ends
+                    global button_up, button_down, button_left, button_right
+                    button_up = Button(4)
+                    button_down = Button(2)
+                    button_left = Button(3)
+                    button_right = Button(5)
+
                     self.in_menu = True
                 elif action == "Rhythm Game":
                     self.in_menu = False
@@ -153,7 +167,6 @@ class GameMenu:
                     self.in_menu = True
                 elif action == "Fighting Game":
                     self.in_menu = False
-                    # Create a new instance so that internal state is fresh
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
