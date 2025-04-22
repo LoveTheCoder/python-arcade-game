@@ -1448,6 +1448,17 @@ def main():
                 display_game_over()
     return  # Removed sys.exit() to allow proper return to the start menu
 
+import atexit
+
+# Ensure GPIO cleanup on exit
+def cleanup_gpio():
+    button_up.close()
+    button_down.close()
+    button_left.close()
+    button_right.close()
+
+atexit.register(cleanup_gpio)
+
 if __name__ == "__main__":
     main()
     

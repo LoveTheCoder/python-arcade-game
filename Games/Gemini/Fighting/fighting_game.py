@@ -888,3 +888,14 @@ class FightingGame:
         self.winner = None
         self.current_background = None
         print("Fighting game state reset to start menu.")
+        
+import atexit
+
+# Ensure GPIO cleanup on exit
+def cleanup_gpio():
+    button_up.close()
+    button_down.close()
+    button_left.close()
+    button_right.close()
+
+atexit.register(cleanup_gpio)

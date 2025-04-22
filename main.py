@@ -161,6 +161,17 @@ class GameMenu:
                     self.running = False
                 self.clock.tick(60)
         pygame.quit()
+        
+import atexit
+
+# Ensure GPIO cleanup on exit
+def cleanup_gpio():
+    button_up.close()
+    button_down.close()
+    button_left.close()
+    button_right.close()
+
+atexit.register(cleanup_gpio)
 
 if __name__ == "__main__":
     pygame.init()
