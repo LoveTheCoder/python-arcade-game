@@ -3,30 +3,9 @@ import sys
 import os
 import random
 import subprocess
-from gpiozero import Button  # Import Button class from gpiozero
 from signal import pause  # For handling GPIO events
 import atexit  # Ensure cleanup on exit
-
-# GPIO Pin Configuration
-def initialize_gpio():
-    return {
-        "button_up": Button(4),    # GPIO pin 4 for "Up"
-        "button_down": Button(2),  # GPIO pin 2 for "Down"
-        "button_left": Button(3),  # GPIO pin 3 for "Left" (Escape/Menu)
-        "button_right": Button(5)  # GPIO pin 5 for "Right" (Enter/Select)
-    }
-
-def cleanup_gpio(buttons):
-    buttons["button_up"].close()
-    buttons["button_down"].close()
-    buttons["button_left"].close()
-    buttons["button_right"].close()
-
-# Initialize GPIO buttons
-gpio_buttons = initialize_gpio()
-
-# Ensure GPIO cleanup on exit
-atexit.register(lambda: cleanup_gpio(gpio_buttons))
+from gpiozero import Button, GPIOZeroError  # Import Button and Error class
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -42,11 +21,10 @@ from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
 
 class GameMenu:
-    def __init__(self, screen, clock, gpio_buttons):
+    def __init__(self, screen, clock):
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 480
         self.screen = screen
-        self.gpio_buttons = gpio_buttons  # Store GPIO buttons
         pygame.display.set_caption("Game Menu")
         
         # Colors
@@ -56,7 +34,7 @@ class GameMenu:
         self.SELECTED_COLOR = (0, 255, 0)
         
         # Menu options
-        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]
+        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]  # Added Exit
         self.selected = 0
         
         # Font
@@ -67,6 +45,42 @@ class GameMenu:
         self.running = True
         self.in_menu = True
         self.clock = clock
+        
+        # GPIO Buttons for Menu
+        self.gpio_buttons = None
+        self.initialize_gpio()  # Initialize GPIO for the menu
+
+    def initialize_gpio(self):
+        """Initializes GPIO buttons for the menu."""
+        if self.gpio_buttons is None:  # Only initialize if not already done
+            try:
+                self.gpio_buttons = {
+                    "button_up": Button(4),
+                    "button_down": Button(2),
+                    "button_left": Button(3),  # Use left for back/exit confirmation
+                    "button_right": Button(5)  # Use right for select
+                }
+                print("Menu GPIO initialized.")
+            except GPIOZeroError as e:
+                print(f"Menu GPIO Error: {e}. Check permissions/pins. Using keyboard fallback.")
+                self.gpio_buttons = None  # Ensure it's None if failed
+            except Exception as e:
+                print(f"Unexpected error initializing menu GPIO: {e}. Using keyboard fallback.")
+                self.gpio_buttons = None  # Ensure it's None if failed
+
+    def cleanup_gpio(self):
+        """Cleans up GPIO buttons used by the menu."""
+        if self.gpio_buttons:
+            try:
+                print("Cleaning up menu GPIO...")
+                self.gpio_buttons["button_up"].close()
+                self.gpio_buttons["button_down"].close()
+                self.gpio_buttons["button_left"].close()
+                self.gpio_buttons["button_right"].close()
+                print("Menu GPIO cleaned up.")
+            except Exception as e:
+                print(f"Error cleaning up menu GPIO: {e}")
+        self.gpio_buttons = None  # Set to None after cleanup attempt
 
     def draw_background(self):
         # Retro styled background: vertical gradient only.
@@ -141,53 +155,111 @@ class GameMenu:
         pygame.display.flip()
 
     def handle_input(self):
-        # Check GPIO button states for navigation
-        if self.gpio_buttons["button_up"].is_pressed:  # Up
-            self.selected = (self.selected - 1) % len(self.options)
-            pygame.time.wait(200)  # Debounce delay
-        elif self.gpio_buttons["button_down"].is_pressed:  # Down
-            self.selected = (self.selected + 1) % len(self.options)
-            pygame.time.wait(200)  # Debounce delay
-        elif self.gpio_buttons["button_right"].is_pressed:  # Right (Enter equivalent)
-            return self.options[self.selected]
-        elif self.gpio_buttons["button_left"].is_pressed:  # Left (Escape equivalent)
-            return "MENU"
-        return None
+        """Handles input for the menu, checking if GPIO is available."""
+        # Check GPIO first if available
+        if self.gpio_buttons:
+            # Check GPIO button states for navigation
+            if self.gpio_buttons["button_up"].is_pressed:
+                self.selected = (self.selected - 1) % len(self.options)
+                pygame.time.wait(200)  # Debounce delay
+            elif self.gpio_buttons["button_down"].is_pressed:
+                self.selected = (self.selected + 1) % len(self.options)
+                pygame.time.wait(200)  # Debounce delay
+            elif self.gpio_buttons["button_right"].is_pressed:  # Right selects
+                pygame.time.wait(200)  # Debounce
+                return self.options[self.selected]
+            elif self.gpio_buttons["button_left"].is_pressed:  # Left goes back/exits menu
+                pygame.time.wait(200)  # Debounce
+                return "Exit"  # Example: Left exits the whole app from menu
+
+        # Always check for Pygame events (QUIT, Keyboard fallback)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "Exit"
+            # Keyboard fallback only if GPIO failed or for testing
+            if not self.gpio_buttons and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    self.selected = (self.selected - 1) % len(self.options)
+                elif event.key == pygame.K_DOWN:
+                    self.selected = (self.selected + 1) % len(self.options)
+                elif event.key == pygame.K_RETURN:
+                    return self.options[self.selected]
+                elif event.key == pygame.K_ESCAPE:
+                    return "Exit"  # Allow Esc to exit
+
+        return None  # No action selected this frame
 
     def run(self):
-        bullet_hell_game = BulletHellGame()  # Initialize the BulletHellGame instance
-        while self.running:
-            if self.in_menu:
-                self.draw_menu()
-                action = self.handle_input()
-                if action == "Bullet Hell":
-                    # Release GPIO pins used by the main menu
-                    cleanup_gpio(self.gpio_buttons)
+        try:  # Wrap run in try...finally for cleanup
+            while self.running:
+                if self.in_menu:
+                    # Ensure GPIO is initialized for the menu state
+                    if not self.gpio_buttons:
+                        self.initialize_gpio()
 
-                    self.in_menu = False
-                    bullet_hell_game.run()
+                    self.draw_menu()
+                    action = self.handle_input()
 
-                    # Reinitialize GPIO pins for the main menu after the game ends
-                    self.gpio_buttons = initialize_gpio()
+                    selected_game_action = None
+                    if action in ["Bullet Hell", "Rhythm Game", "Fighting Game"]:
+                        selected_game_action = action
+                    elif action == "Exit":
+                        self.running = False
+                        break  # Exit the main loop
 
-                    self.in_menu = True
-                elif action == "Rhythm Game":
-                    self.in_menu = False
-                    rhythm_game_main()
-                    self.in_menu = True
-                elif action == "Fighting Game":
-                    self.in_menu = False
-                    fighting_game = FightingGame(self.screen, self.clock)
-                    fighting_game.run()
-                    self.in_menu = True
-                elif action == "Exit" or action == "QUIT":
-                    self.running = False
+                    if selected_game_action:
+                        print(f"Selected {selected_game_action}")
+                        self.cleanup_gpio()  # Release menu GPIO before starting game
+                        self.in_menu = False
+
+                        try:
+                            if selected_game_action == "Bullet Hell":
+                                print("Starting Bullet Hell...")
+                                bullet_hell_game = BulletHellGame()
+                                bullet_hell_game.run()
+                                print("Bullet Hell finished.")
+                            elif selected_game_action == "Rhythm Game":
+                                print("Starting Rhythm Game...")
+                                rhythm_game_main()
+                                print("Rhythm Game finished.")
+                            elif selected_game_action == "Fighting Game":
+                                print("Starting Fighting Game...")
+                                fighting_game = FightingGame(self.screen, self.clock)
+                                fighting_game.run()
+                                print("Fighting Game finished.")
+                        except Exception as e:
+                            print(f"Error running game {selected_game_action}: {e}")
+                        finally:
+                            # Ensure menu state is restored even if game crashes
+                            self.in_menu = True
+                            # GPIO will be re-initialized at the start of the menu loop iteration
+                            print("Returned to menu.")
+
                 self.clock.tick(60)
-        pygame.quit()
+        finally:  # Ensure cleanup happens when run() exits
+            print("Exiting application run loop...")
+            self.cleanup_gpio()  # Clean up menu GPIO specifically
+            pygame.quit()  # Quit Pygame
 
 if __name__ == "__main__":
     pygame.init()
-    screen = pygame.display.set_mode((800, 480))
-    clock = pygame.time.Clock()
-    menu = GameMenu(screen, clock, gpio_buttons)
-    menu.run()
+    # Set SDL video driver if needed
+    # import os
+    # os.environ["SDL_VIDEODRIVER"] = "kmsdrm"  # or "x11"
+    screen = None  # Initialize screen to None
+    try:
+        screen = pygame.display.set_mode((800, 480))
+        clock = pygame.time.Clock()
+        menu = GameMenu(screen, clock)
+        menu.run()  # run() now handles pygame.quit() in its finally block
+    except pygame.error as e:
+        print(f"Pygame error: {e}")
+        print("Ensure display environment is set up correctly.")
+    except Exception as e:
+        print(f"An unexpected error occurred in main: {e}")
+    finally:
+        # Ensure pygame quits even if GameMenu creation failed
+        if pygame.get_init():
+            pygame.quit()
+        print("Application finished.")
+        sys.exit()

@@ -4,20 +4,8 @@ import sys
 import math
 import os
 import shutil
-from gpiozero import Button  # Import Button class from gpiozero
-from signal import pause  # For handling GPIO events
+from gpiozero import Button
 import atexit
-
-gpio_initialized = False
-
-if not gpio_initialized:
-    button_up = Button(6)
-    button_down = Button(7)
-    button_left = Button(8)
-    button_right = Button(9)
-    gpio_initialized = True
-
-#test
 
 # Get the directory of the current Python file
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -379,13 +367,13 @@ class Player(pygame.sprite.Sprite):
         else:
             self.base_speed = 5  # Reset to base speed
         
-        if button_left.is_pressed:
+        if game.gpio_buttons["button_left"].is_pressed:
             self.speedx = -self.base_speed
-        if button_right.is_pressed:
+        if game.gpio_buttons["button_right"].is_pressed:
             self.speedx = self.base_speed
-        if button_up.is_pressed:
+        if game.gpio_buttons["button_up"].is_pressed:
             self.speedy = -self.base_speed
-        if button_down.is_pressed:
+        if game.gpio_buttons["button_down"].is_pressed:
             self.speedy = self.base_speed
         
         self.rect.x += self.speedx
@@ -1052,9 +1040,9 @@ def start_menu(screen, font, clock):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if button_up.is_pressed:
+                if game.gpio_buttons["button_up"].is_pressed:
                     selected = (selected - 1) % len(options)
-                elif button_down.is_pressed:
+                elif game.gpio_buttons["button_down"].is_pressed:
                     selected = (selected + 1) % len(options)
                 elif event.key == pygame.K_RETURN:
                     return options[selected]
@@ -1096,9 +1084,25 @@ class BulletHellGame:
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Bullet Hell")
         self.clock = pygame.time.Clock()
+        self.gpio_buttons = None
         
         # Initialize game objects and variables
         self.init_game()
+
+    def initialize_gpio(self):
+        self.gpio_buttons = {
+            "button_up": Button(4),
+            "button_down": Button(2),
+            "button_left": Button(3),
+            "button_right": Button(5)
+        }
+
+    def cleanup_gpio(self):
+        if self.gpio_buttons:
+            self.gpio_buttons["button_up"].close()
+            self.gpio_buttons["button_down"].close()
+            self.gpio_buttons["button_left"].close()
+            self.gpio_buttons["button_right"].close()
 
     def init_game(self):
         global player, all_sprites, bullets, enemy_bullets, enemies, bosses, power_points, points
@@ -1117,11 +1121,13 @@ class BulletHellGame:
                     self.running = False
 
     def run(self):
+        self.initialize_gpio()
+        atexit.register(self.cleanup_gpio)  # Ensure cleanup on exit
         try:
             while True:
                 menu_choice = start_menu(self.screen, font, self.clock)
                 if menu_choice == "Return to Main Menu":
-                    cleanup_gpio()  # Clean up GPIO before returning to the main menu
+                    self.cleanup_gpio()  # Clean up GPIO before returning to the main menu
                     return
                 reset_game(False)  # Reset game state before a new session
                 self.running = True
@@ -1129,7 +1135,7 @@ class BulletHellGame:
         except Exception as e:
             print(f"Error: {e}")
         finally:
-            cleanup_gpio()  # Ensure GPIO cleanup on any error or exit
+            self.cleanup_gpio()  # Ensure GPIO cleanup on any error or exit
             
     def game_loop(self):
         global game_over, boss_spawned, boss_active, level_complete, level, game_won
@@ -1458,16 +1464,6 @@ def main():
                 display_game_over()
     return  # Removed sys.exit() to allow proper return to the start menu
 
-# Ensure GPIO cleanup on exit
-def cleanup_gpio():
-    button_up.close()
-    button_down.close()
-    button_left.close()
-    button_right.close()
-
-atexit.register(cleanup_gpio)
-
 if __name__ == "__main__":
-    main()
-    
-    #test 2
+    game = BulletHellGame()
+    game.run()
