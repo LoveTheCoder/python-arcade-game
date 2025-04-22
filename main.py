@@ -8,6 +8,17 @@ import atexit  # Ensure cleanup on exit
 from gpiozero import Button, GPIOZeroError  # Import Button and Error class
 import time  # Import time for additional delays
 
+# Check if we are running as root - if not, recommend running with sudo
+try:
+    # Only do this on Raspberry Pi (not on development machines)
+    if os.path.exists('/sys/class/gpio'):
+        if os.geteuid() != 0:
+            print("Warning: Not running as root. GPIO access may fail.")
+            print("Consider running with: sudo python main.py")
+except:
+    # Not on a Pi or can't check - continue anyway
+    pass
+
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
 
@@ -241,31 +252,53 @@ class GameMenu:
                         print(f"Selected {selected_game_action}")
                         self.cleanup_gpio()  # Release menu GPIO before starting game
                         self.in_menu = False
-                        pygame.time.wait(200)  # Wait for GPIO to fully release
+                        pygame.time.wait(500)  # Wait longer for pins to fully release
 
                         try:
                             if selected_game_action == "Bullet Hell":
                                 print("Starting Bullet Hell...")
-                                bullet_hell_game = BulletHellGame()
-                                bullet_hell_game.run()
+                                # Run with sudo to get GPIO access if needed
+                                try:
+                                    bullet_hell_game = BulletHellGame()
+                                    bullet_hell_game.run()
+                                except Exception as e:
+                                    print(f"BulletHellGame error: {str(e)}")
+                                    import traceback
+                                    traceback.print_exc()
                                 print("Bullet Hell finished.")
                             elif selected_game_action == "Rhythm Game":
                                 print("Starting Rhythm Game...")
-                                rhythm_game_main()
+                                try:
+                                    # Allow more time for GPIO to be completely released
+                                    time.sleep(0.5)  
+                                    rhythm_game_main()
+                                except Exception as e:
+                                    print(f"Rhythm game error: {str(e)}")
+                                    import traceback
+                                    traceback.print_exc()
                                 print("Rhythm Game finished.")
                             elif selected_game_action == "Fighting Game":
                                 print("Starting Fighting Game...")
-                                fighting_game = FightingGame(self.screen, self.clock)
-                                fighting_game.run()
+                                try:
+                                    # Allow more time for GPIO to be completely released
+                                    time.sleep(0.5)
+                                    fighting_game = FightingGame(self.screen, self.clock)
+                                    fighting_game.run()
+                                except Exception as e:
+                                    print(f"Fighting game error: {str(e)}")
+                                    import traceback
+                                    traceback.print_exc()
                                 print("Fighting Game finished.")
                         except Exception as e:
                             print(f"Error running game {selected_game_action}: {e}")
+                            import traceback
+                            traceback.print_exc()
                         finally:
                             # Ensure menu state is restored even if game crashes
                             self.in_menu = True
                             # Force reinitialize GPIO after returning from game
                             self.gpio_buttons = None
-                            pygame.time.wait(500)  # Wait additional time for pins to settle
+                            pygame.time.wait(1000)  # Wait additional time for pins to settle
                             print("Returned to menu.")
 
                 self.clock.tick(60)
