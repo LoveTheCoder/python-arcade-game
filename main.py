@@ -4,7 +4,11 @@ import os
 import random
 import subprocess
 
-# Removed update_game_from_github and configure_wifi functions
+# Try to import gpiozero; if not available, ignore GPIO input.
+try:
+    from gpiozero import Button
+except ImportError:
+    Button = None
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -44,6 +48,21 @@ class GameMenu:
         self.running = True
         self.in_menu = True
         self.clock = clock
+
+        # Initialize GPIO buttons using gpiozero if available.
+        if Button:
+            self.gpio_buttons = {
+                'down': Button(2, pull_up=True, bounce_time=0.1),
+                'left': Button(3, pull_up=True, bounce_time=0.1),
+                'up': Button(4, pull_up=True, bounce_time=0.1),
+                'right': Button(5, pull_up=True, bounce_time=0.1),
+                'esc': Button(6, pull_up=True, bounce_time=0.1),
+                'select': Button(7, pull_up=True, bounce_time=0.1)
+            }
+            # Last state for each GPIO button to detect rising edge
+            self.last_gpio_state = {name: False for name in self.gpio_buttons}
+        else:
+            self.gpio_buttons = None
 
     def draw_background(self):
         # Retro styled background: vertical gradient only.
@@ -111,13 +130,14 @@ class GameMenu:
             self.screen.blit(text, text_rect)
 
         # Draw instructions for game selection.
-        instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
+        instructions = self.small_font.render("Press UP/DOWN or GPIO, ENTER or SELECT to start, ESC to go back", True, self.WHITE)
         instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
                 
         pygame.display.flip()
 
     def handle_input(self):
+        # Process pygame keyboard events.
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -131,6 +151,22 @@ class GameMenu:
                     return self.options[self.selected]
                 elif event.key == pygame.K_ESCAPE:
                     return "MENU"
+
+        # Process GPIO inputs if available.
+        if self.gpio_buttons:
+            for name, button in self.gpio_buttons.items():
+                current_state = button.is_pressed
+                if current_state and not self.last_gpio_state[name]:
+                    if name == 'up':
+                        self.selected = (self.selected - 1) % len(self.options)
+                    elif name == 'down':
+                        self.selected = (self.selected + 1) % len(self.options)
+                    elif name == 'select':
+                        return self.options[self.selected]
+                    elif name == 'esc':
+                        return "MENU"
+                self.last_gpio_state[name] = current_state
+
         return None
 
     def run(self):
@@ -149,11 +185,10 @@ class GameMenu:
                     self.in_menu = True
                 elif action == "Fighting Game":
                     self.in_menu = False
-                    # Create a new instance so that internal state is fresh
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
-                elif action == "Exit" or action == "QUIT":
+                elif action == "Exit" or action == "QUIT" or action == "MENU":
                     self.running = False
                 self.clock.tick(60)
         pygame.quit()
