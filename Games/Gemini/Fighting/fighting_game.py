@@ -334,23 +334,48 @@ class FightingGame:
         self.current_background = None
 
     def initialize_gpio(self):
+        """Initializes GPIO for Fighting Game with fallback support."""
         try:
             # Joystick controls
-            self.button_up = Button(4)       # GPIO pin 4 for "Up"
-            self.button_down = Button(2)     # GPIO pin 2 for "Down"
-            self.button_left = Button(3)     # GPIO pin 3 for "Left"
-            self.button_right = Button(5)    # GPIO pin 5 for "Right"
+            self.button_up = Button(4)
+            self.button_down = Button(2)
+            self.button_left = Button(3)
+            self.button_right = Button(5)
             
             # Additional buttons
-            self.button_esc = Button(6)      # GPIO pin 6 for "ESC"
-            self.button_select = Button(7)   # GPIO pin 7 for "Select"
-            self.button_punch = Button(8)    # GPIO pin 8 for "Punch"
-            self.button_kick = Button(9)     # GPIO pin 9 for "Kick"
-            self.button_block = Button(10)   # GPIO pin 10 for "Block/Dodge"
+            self.button_esc = Button(6)
+            self.button_select = Button(7)
+            self.button_punch = Button(8)
+            self.button_kick = Button(9)
+            self.button_block = Button(10)
             
             print("Fighting Game GPIO initialized.")
+        #except GPIOZeroError as e:
+            print(f"Fighting Game GPIO Error: {e}")
+            # Set all buttons to None for safety
+            self.button_up = None
+            self.button_down = None
+            self.button_left = None
+            self.button_right = None
+            self.button_esc = None
+            self.button_select = None
+            self.button_punch = None
+            self.button_kick = None
+            self.button_block = None
+            print("Falling back to keyboard controls.")
         except Exception as e:
             print(f"Error initializing Fighting Game GPIO: {e}")
+            # Set all buttons to None for safety
+            self.button_up = None
+            self.button_down = None
+            self.button_left = None
+            self.button_right = None
+            self.button_esc = None
+            self.button_select = None
+            self.button_punch = None
+            self.button_kick = None
+            self.button_block = None
+            print("Falling back to keyboard controls.")
 
     def cleanup_gpio(self):
         try:
@@ -649,49 +674,65 @@ class FightingGame:
         """Handles player input during the game running state."""
         performed_attack_type = None
 
-        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
+        # Single Event Loop
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE or (hasattr(self, 'button_esc') and self.button_esc.is_pressed):
+                if event.key == pygame.K_ESCAPE:
                     self.game_state = STATE_PAUSED
                     self.selected_pause_option = 0
                     return None
-
-                # Actions triggered on key press
-                if self.player:
-                    # ... keyboard handling ...
-                    pass
-
-        # Check GPIO buttons for movement and attacks
-        if self.player and hasattr(self, 'button_up'):
-            # --- Movement inputs ---
-            # Add directional inputs to buffer based on joystick
-            if self.button_up.is_pressed:
-                self.player._add_direction_to_buffer('up')
-                self.player.jump()  # Trigger jump action
-            elif self.button_down.is_pressed:
-                self.player._add_direction_to_buffer('down')
-                self.player.crouch()  # Trigger crouch action
-            elif self.button_left.is_pressed:
-                self.player._add_direction_to_buffer('left')
-                self.player.move_left()  # Call movement method
-            elif self.button_right.is_pressed:
-                self.player._add_direction_to_buffer('right')
-                self.player.move_right()  # Call movement method
                 
-            # --- Attack inputs ---
-            if self.button_punch.is_pressed:  # Punch with button on pin 8
-                performed_attack_type = self.player.attack("punch")
-            elif self.button_kick.is_pressed:  # Kick with button on pin 9
-                performed_attack_type = self.player.attack("kick")
-            elif self.button_block.is_pressed:  # Block/Dodge with button on pin 10
-                self.player.dodge()
+                # Handle keyboard input for player actions
+                if self.player:
+                    # Add keyboard controls here as fallback
+                    if event.key == pygame.K_LEFT:
+                        self.player.move_left()
+                    elif event.key == pygame.K_RIGHT:
+                        self.player.move_right()
+                    elif event.key == pygame.K_UP:
+                        self.player.jump()
+                    elif event.key == pygame.K_DOWN:
+                        self.player.crouch()
+                    elif event.key == pygame.K_q:  # Q for punch
+                        performed_attack_type = self.player.attack("punch")
+                    elif event.key == pygame.K_w:  # W for kick
+                        performed_attack_type = self.player.attack("kick")
+                    elif event.key == pygame.K_e:  # E for block/dodge
+                        self.player.dodge()
 
-        # --- Process Attack (if any was performed) ---
+        # Check GPIO buttons for movement and attacks - with safety checks
+        if self.player:
+            try:
+                # Only check buttons if they exist and are properly initialized
+                if hasattr(self, 'button_up') and self.button_up and self.button_up.is_pressed:
+                    self.player._add_direction_to_buffer('up')
+                    self.player.jump()
+                elif hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed:
+                    self.player._add_direction_to_buffer('down')
+                    self.player.crouch()
+                elif hasattr(self, 'button_left') and self.button_left and self.button_left.is_pressed:
+                    self.player._add_direction_to_buffer('left')
+                    self.player.move_left()
+                elif hasattr(self, 'button_right') and self.button_right and self.button_right.is_pressed:
+                    self.player._add_direction_to_buffer('right')
+                    self.player.move_right()
+                
+                # Attack inputs with safety checks
+                if hasattr(self, 'button_punch') and self.button_punch and self.button_punch.is_pressed:
+                    performed_attack_type = self.player.attack("punch")
+                elif hasattr(self, 'button_kick') and self.button_kick and self.button_kick.is_pressed:
+                    performed_attack_type = self.player.attack("kick")
+                elif hasattr(self, 'button_block') and self.button_block and self.button_block.is_pressed:
+                    self.player.dodge()
+            except Exception as e:
+                # Log error but continue with gameplay
+                print(f"GPIO input error: {e}")
+
+        # Process attack if any was performed
         if performed_attack_type and self.opponent:
             self.handle_attack(self.player, self.opponent, performed_attack_type)
 

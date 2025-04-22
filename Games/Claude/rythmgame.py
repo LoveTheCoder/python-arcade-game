@@ -7,6 +7,7 @@ import math
 from gpiozero import Button, GPIOZeroError
 from signal import pause
 import atexit
+import time
 
 # Constants
 WIDTH, HEIGHT = 800, 480
@@ -509,6 +510,10 @@ def start_song(game_state):
 def main():
     gpio_buttons = None
     try:
+        print("Initializing Rhythm Game GPIO...")
+        # Wait a moment to ensure pins are fully released
+        time.sleep(0.2)
+        
         gpio_buttons = {
             # Joystick controls
             "button_up": Button(4),
@@ -525,22 +530,22 @@ def main():
         print("Rhythm Game GPIO initialized.")
     except GPIOZeroError as e:
         print(f"Rhythm Game GPIO Error: {e}. Check permissions or pin usage.")
+        # Continue with keyboard controls
     except Exception as e:
         print(f"Unexpected error initializing Rhythm Game GPIO: {e}")
 
+    # GPIO Cleanup Function
     def cleanup_rhythm_gpio():
         nonlocal gpio_buttons
         if gpio_buttons:
             try:
-                gpio_buttons["button_up"].close()
-                gpio_buttons["button_down"].close()
-                gpio_buttons["button_left"].close()
-                gpio_buttons["button_right"].close()
-                gpio_buttons["button_esc"].close()
-                gpio_buttons["button_select"].close()
-                gpio_buttons["button_action1"].close()
-                gpio_buttons["button_action2"].close()
-                gpio_buttons["button_action3"].close()
+                print("Cleaning up Rhythm Game GPIO...")
+                # Close all buttons
+                for button_name, button in gpio_buttons.items():
+                    try:
+                        button.close()
+                    except:
+                        pass
                 print("Rhythm Game GPIO cleaned up.")
             except Exception as e:
                 print(f"Error cleaning up Rhythm Game GPIO: {e}")
@@ -717,7 +722,9 @@ def main():
             clock.tick(60)
 
     finally:
+        print("Exiting Rhythm Game, cleaning up resources...")
         cleanup_rhythm_gpio()
+        # Don't call pygame.quit() here - it's handled by main.py
 
 def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index, selected_menu_item):
     background = create_background()

@@ -6,6 +6,7 @@ import subprocess
 from signal import pause  # For handling GPIO events
 import atexit  # Ensure cleanup on exit
 from gpiozero import Button, GPIOZeroError  # Import Button and Error class
+import time  # Import time for additional delays
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -34,7 +35,7 @@ class GameMenu:
         self.SELECTED_COLOR = (0, 255, 0)
         
         # Menu options
-        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]  # Added Exit
+        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]
         self.selected = 0
         
         # Font
@@ -52,28 +53,34 @@ class GameMenu:
 
     def initialize_gpio(self):
         """Initializes GPIO buttons for the menu."""
-        if self.gpio_buttons is None:  # Only initialize if not already done
-            try:
-                self.gpio_buttons = {
-                    # Joystick buttons
-                    "button_up": Button(4),
-                    "button_down": Button(2),
-                    "button_left": Button(3),
-                    "button_right": Button(5),
-                    # Additional buttons
-                    "button_esc": Button(6),      # New ESC button
-                    "button_select": Button(7),   # New Select button
-                    "button_action1": Button(8),  # New Action button 1
-                    "button_action2": Button(9),  # New Action button 2
-                    "button_action3": Button(10)  # New Action button 3
-                }
-                print("Menu GPIO initialized.")
-            except GPIOZeroError as e:
-                print(f"Menu GPIO Error: {e}. Check permissions/pins. Using keyboard fallback.")
-                self.gpio_buttons = None  # Ensure it's None if failed
-            except Exception as e:
-                print(f"Unexpected error initializing menu GPIO: {e}. Using keyboard fallback.")
-                self.gpio_buttons = None  # Ensure it's None if failed
+        # First make sure we clean up any existing buttons
+        self.cleanup_gpio()
+        
+        # Wait a moment to ensure pins are released
+        time.sleep(0.2)
+        
+        # Now initialize new buttons
+        try:
+            self.gpio_buttons = {
+                # Joystick buttons
+                "button_up": Button(4),
+                "button_down": Button(2),
+                "button_left": Button(3),
+                "button_right": Button(5),
+                # Additional buttons
+                "button_esc": Button(6),      # ESC button
+                "button_select": Button(7),   # Select button
+                "button_action1": Button(8),  # Action button 1
+                "button_action2": Button(9),  # Action button 2
+                "button_action3": Button(10)  # Action button 3
+            }
+            print("Menu GPIO initialized.")
+        except GPIOZeroError as e:
+            print(f"Menu GPIO Error: {e}. Check permissions/pins. Using keyboard fallback.")
+            self.gpio_buttons = None  # Ensure it's None if failed
+        except Exception as e:
+            print(f"Unexpected error initializing menu GPIO: {e}. Using keyboard fallback.")
+            self.gpio_buttons = None  # Ensure it's None if failed
 
     def cleanup_gpio(self):
         """Cleans up GPIO buttons used by the menu."""
@@ -162,7 +169,7 @@ class GameMenu:
             self.screen.blit(text, text_rect)
 
         # Draw instructions for game selection.
-        instructions = self.small_font.render("Press UP/DOWN to select, SELECT to start", True, self.WHITE)
+        instructions = self.small_font.render("Press UP/DOWN to select, SELECT to start, ESC to exit", True, self.WHITE)
         instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
                 
@@ -172,30 +179,39 @@ class GameMenu:
         """Handles input for the menu, checking if GPIO is available."""
         # Check GPIO first if available
         if self.gpio_buttons:
-            # Check GPIO button states for navigation
-            if self.gpio_buttons["button_up"].is_pressed:
-                self.selected = (self.selected - 1) % len(self.options)
-                pygame.time.wait(200)  # Debounce delay
-            elif self.gpio_buttons["button_down"].is_pressed:
-                self.selected = (self.selected + 1) % len(self.options)
-                pygame.time.wait(200)  # Debounce delay
-            elif self.gpio_buttons["button_select"].is_pressed:  # Use SELECT button instead of RIGHT
-                pygame.time.wait(200)  # Debounce
-                return self.options[self.selected]
-            elif self.gpio_buttons["button_esc"].is_pressed:  # ESC button to exit
-                pygame.time.wait(200)  # Debounce
-                return "Exit"  # Exit the whole app from menu
+            try:
+                # Check GPIO button states for navigation
+                if self.gpio_buttons["button_up"].is_pressed:
+                    self.selected = (self.selected - 1) % len(self.options)
+                    pygame.time.wait(200)  # Debounce delay
+                    return None
+                elif self.gpio_buttons["button_down"].is_pressed:
+                    self.selected = (self.selected + 1) % len(self.options)
+                    pygame.time.wait(200)  # Debounce delay
+                    return None
+                elif self.gpio_buttons["button_select"].is_pressed:  # SELECT button
+                    pygame.time.wait(200)  # Debounce
+                    return self.options[self.selected]
+                elif self.gpio_buttons["button_esc"].is_pressed:  # ESC button
+                    pygame.time.wait(200)  # Debounce
+                    return "Exit"
+            except Exception as e:
+                print(f"Error reading GPIO buttons: {e}")
+                # If there was an error, try to reinitialize
+                self.initialize_gpio()
 
         # Always check for Pygame events (QUIT, Keyboard fallback)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "Exit"
-            # Keyboard fallback only if GPIO failed or for testing
-            if not self.gpio_buttons and event.type == pygame.KEYDOWN:
+            # Keyboard fallback or for testing
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     self.selected = (self.selected - 1) % len(self.options)
+                    return None
                 elif event.key == pygame.K_DOWN:
                     self.selected = (self.selected + 1) % len(self.options)
+                    return None
                 elif event.key == pygame.K_RETURN:
                     return self.options[self.selected]
                 elif event.key == pygame.K_ESCAPE:
@@ -225,6 +241,7 @@ class GameMenu:
                         print(f"Selected {selected_game_action}")
                         self.cleanup_gpio()  # Release menu GPIO before starting game
                         self.in_menu = False
+                        pygame.time.wait(200)  # Wait for GPIO to fully release
 
                         try:
                             if selected_game_action == "Bullet Hell":
@@ -246,7 +263,9 @@ class GameMenu:
                         finally:
                             # Ensure menu state is restored even if game crashes
                             self.in_menu = True
-                            # GPIO will be re-initialized at the start of the menu loop iteration
+                            # Force reinitialize GPIO after returning from game
+                            self.gpio_buttons = None
+                            pygame.time.wait(500)  # Wait additional time for pins to settle
                             print("Returned to menu.")
 
                 self.clock.tick(60)
