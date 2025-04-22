@@ -4,6 +4,14 @@ import sys
 import math
 import os
 import shutil
+import RPi.GPIO as GPIO  # Import GPIO library
+
+# GPIO Pin Configuration
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
+GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
+GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
+GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
 
 #test
 
@@ -367,13 +375,13 @@ class Player(pygame.sprite.Sprite):
         else:
             self.base_speed = 5  # Reset to base speed
         
-        if key_state[pygame.K_LEFT]:
+        if key_state[GPIO.input(3)]:
             self.speedx = -self.base_speed
-        if key_state[pygame.K_RIGHT]:
+        if key_state[GPIO.input(5)]:
             self.speedx = self.base_speed
-        if key_state[pygame.K_UP]:
+        if key_state[GPIO.input(4)]:
             self.speedy = -self.base_speed
-        if key_state[pygame.K_DOWN]:
+        if key_state[GPIO.input(2)]:
             self.speedy = self.base_speed
         
         self.rect.x += self.speedx
@@ -1040,9 +1048,9 @@ def start_menu(screen, font, clock):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
+                if event.key == GPIO.input(4):
                     selected = (selected - 1) % len(options)
-                elif event.key == pygame.K_DOWN:
+                elif event.key == GPIO.input(2):
                     selected = (selected + 1) % len(options)
                 elif event.key == pygame.K_RETURN:
                     return options[selected]

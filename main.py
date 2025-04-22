@@ -3,6 +3,14 @@ import sys
 import os
 import random
 import subprocess
+import RPi.GPIO as GPIO  # Import GPIO library
+
+# GPIO Pin Configuration
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
+GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
+GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
+GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
 
 # Removed update_game_from_github and configure_wifi functions
 
@@ -123,9 +131,9 @@ class GameMenu:
                 self.running = False
                 return "QUIT"
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
+                if event.key == GPIO.input(4):
                     self.selected = (self.selected - 1) % len(self.options)
-                elif event.key == pygame.K_DOWN:
+                elif event.key == GPIO.input(2):
                     self.selected = (self.selected + 1) % len(self.options)
                 elif event.key == pygame.K_RETURN:
                     return self.options[self.selected]
