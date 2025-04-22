@@ -19,17 +19,17 @@ def init_gpio():
     try:
         gpio_buttons = {
             # Directional buttons
-            "button_up": Button(4),
-            "button_down": Button(2),
-            "button_left": Button(3),
-            "button_right": Button(5),
+            "up": Button(4),
+            "down": Button(2),
+            "left": Button(3),
+            "right": Button(5),
             # Menu buttons
-            "button_esc": Button(6),
-            "button_select": Button(7),
+            "esc": Button(6),
+            "select": Button(7),
             # Action buttons
-            "button_action1": Button(8),  # Primary action (shoot/hit/select)
-            "button_action2": Button(9),  # Secondary action
-            "button_action3": Button(10)  # Tertiary action
+            "action1": Button(8),  # Primary action (shoot/hit/select)
+            "action2": Button(9),  # Secondary action
+            "action3": Button(10)  # Tertiary action
         }
         print("Bullet Hell: GPIO buttons initialized successfully")
         return gpio_buttons
