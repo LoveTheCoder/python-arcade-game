@@ -5,8 +5,7 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
-from gpiozero import Button  # Import Button class from gpiozero
-from signal import pause  # For handling GPIO events
+from gpiozero import Button, GPIOZeroError
 import atexit
 
 # Add Game States
@@ -17,6 +16,45 @@ STATE_GAME_RUNNING = 3
 STATE_PAUSED = 4
 STATE_GAME_OVER_WIN = 5  # New state
 STATE_GAME_OVER_LOSE = 6  # New state
+
+# Initialize GPIO buttons
+def initialize_gpio():
+    try:
+        gpio_buttons = {
+            # Directional buttons
+            "button_up": Button(4),
+            "button_down": Button(2),
+            "button_left": Button(3),
+            "button_right": Button(5),
+            # Menu buttons
+            "button_esc": Button(6),
+            "button_select": Button(7),
+            # Action buttons
+            "button_action1": Button(8),  # Primary action (shoot/hit/select)
+            "button_action2": Button(9),  # Secondary action
+            "button_action3": Button(10)  # Tertiary action
+        }
+        print("GPIO buttons initialized")
+        return gpio_buttons
+    except GPIOZeroError as e:
+        print(f"GPIO Error: {e}. Falling back to keyboard controls.")
+        return None
+    except Exception as e:
+        print(f"Unexpected error initializing GPIO: {e}")
+        return None
+
+# Cleanup GPIO
+def cleanup_gpio(gpio_buttons):
+    if gpio_buttons:
+        try:
+            for button_name, button in gpio_buttons.items():
+                button.close()
+            print("GPIO cleaned up")
+        except Exception as e:
+            print(f"Error cleaning up GPIO: {e}")
+
+# Register cleanup at exit
+atexit.register(cleanup_gpio)
 
 # --- Background Generation Function ---
 def generate_level_background(level, width, height, floor_level):
@@ -269,19 +307,6 @@ class FightingGame:
         self.screen_height = screen.get_height()
         self.clock = clock
 
-        # GPIO Pin Configuration
-        self.button_up = None
-        self.button_down = None
-        self.button_left = None
-        self.button_right = None
-        self.button_esc = None
-        self.button_select = None
-        self.button_punch = None
-        self.button_kick = None
-        self.button_block = None
-
-        self.running = False  # Initialize running flag
-
         # --- Load Fonts ---
         # Try loading a font known to support symbols, fallback to default
         try:
@@ -315,6 +340,7 @@ class FightingGame:
             "Q": "Punch",
             "W": "Kick"
         }
+        self.running = False  # Initialize running flag
 
         # Menu/State Management
         self.game_state = STATE_START_MENU
@@ -332,78 +358,6 @@ class FightingGame:
         # --- End Attack List Scroll State ---
 
         self.current_background = None
-
-    def initialize_gpio(self):
-        """Initializes GPIO for Fighting Game with fallback support."""
-        try:
-            # Joystick controls
-            self.button_up = Button(4)
-            self.button_down = Button(2)
-            self.button_left = Button(3)
-            self.button_right = Button(5)
-            
-            # Additional buttons
-            self.button_esc = Button(6)
-            self.button_select = Button(7)
-            self.button_punch = Button(8)
-            self.button_kick = Button(9)
-            self.button_block = Button(10)
-            
-            print("Fighting Game GPIO initialized.")
-        #except GPIOZeroError as e:
-            print(f"Fighting Game GPIO Error: {e}")
-            # Set all buttons to None for safety
-            self.button_up = None
-            self.button_down = None
-            self.button_left = None
-            self.button_right = None
-            self.button_esc = None
-            self.button_select = None
-            self.button_punch = None
-            self.button_kick = None
-            self.button_block = None
-            print("Falling back to keyboard controls.")
-        except Exception as e:
-            print(f"Error initializing Fighting Game GPIO: {e}")
-            # Set all buttons to None for safety
-            self.button_up = None
-            self.button_down = None
-            self.button_left = None
-            self.button_right = None
-            self.button_esc = None
-            self.button_select = None
-            self.button_punch = None
-            self.button_kick = None
-            self.button_block = None
-            print("Falling back to keyboard controls.")
-
-    def cleanup_gpio(self):
-        try:
-            # Close joystick buttons
-            if hasattr(self, 'button_up'):
-                self.button_up.close()
-            if hasattr(self, 'button_down'):
-                self.button_down.close()
-            if hasattr(self, 'button_left'):
-                self.button_left.close()
-            if hasattr(self, 'button_right'):
-                self.button_right.close()
-                
-            # Close additional buttons
-            if hasattr(self, 'button_esc'):
-                self.button_esc.close()
-            if hasattr(self, 'button_select'):
-                self.button_select.close()
-            if hasattr(self, 'button_punch'):
-                self.button_punch.close()
-            if hasattr(self, 'button_kick'):
-                self.button_kick.close()
-            if hasattr(self, 'button_block'):
-                self.button_block.close()
-                
-            print("Fighting Game GPIO cleaned up.")
-        except Exception as e:
-            print(f"Error cleaning up Fighting Game GPIO: {e}")
 
     def initialize_game_session(self, level):
         """Sets up player, opponent, and background for the selected level."""
@@ -599,28 +553,23 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"  # Signal exit
-                
-        # Check GPIO buttons for menu navigation        
-        if hasattr(self, 'button_up') and self.button_up.is_pressed:
-            self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_down') and self.button_down.is_pressed:
-            self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_select') and self.button_select.is_pressed:  # SELECT button to confirm
-            if self.selected_start_option == 0:  # Start Game -> Go to Level Select
-                self.game_state = STATE_LEVEL_SELECT
-                self.selected_level = 1  # Reset level selection
-            elif self.selected_start_option == 1:  # Attack List
-                self.game_state = STATE_ATTACK_LIST
-            elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
-                self.running = False  # Stop this game's loop
-                return "QUIT"  # Signal exit from this game instance
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_esc') and self.button_esc.is_pressed:  # ESC button to exit
-            self.running = False
-            return "QUIT"
-            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
+                elif event.key == pygame.K_DOWN:
+                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
+                elif event.key == pygame.K_RETURN:
+                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
+                        self.game_state = STATE_LEVEL_SELECT
+                        self.selected_level = 1  # Reset level selection
+                    elif self.selected_start_option == 1:  # Attack List
+                        self.game_state = STATE_ATTACK_LIST
+                    elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
+                        self.running = False  # Stop this game's loop
+                        return "QUIT"  # Signal exit from this game instance
+                elif event.key == pygame.K_ESCAPE:  # Allow ESC to exit from this game's menu
+                    self.running = False
+                    return "QUIT"
         return None  # No action taken this frame
 
     def handle_level_select_input(self):
@@ -630,29 +579,21 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-                
-        # Check GPIO buttons for level selection
-        if hasattr(self, 'button_esc') and self.button_esc.is_pressed:  # ESC to return to menu
-            self.game_state = STATE_START_MENU
-            pygame.time.wait(200)  # Debounce
-            return None
-        elif hasattr(self, 'button_select') and self.button_select.is_pressed:  # SELECT to confirm level
-            self.initialize_game_session(self.selected_level)
-            pygame.time.wait(200)  # Debounce
-            return None  # Stay in game loop, state changed
-        elif hasattr(self, 'button_up') and self.button_up.is_pressed:
-            self.selected_level = (self.selected_level - 1) % total_options
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_down') and self.button_down.is_pressed:
-            self.selected_level = (self.selected_level + 1) % total_options
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_left') and self.button_left.is_pressed:
-            self.selected_level = max(0, self.selected_level - 1)
-            pygame.time.wait(200)  # Debounce
-        elif hasattr(self, 'button_right') and self.button_right.is_pressed:
-            self.selected_level = min(total_options - 1, self.selected_level + 1)
-            pygame.time.wait(200)  # Debounce
-            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game_state = STATE_START_MENU
+                    return None
+                elif event.key == pygame.K_RETURN:
+                    self.initialize_game_session(self.selected_level)
+                    return None # Stay in game loop, state changed
+                elif event.key == pygame.K_UP:
+                    self.selected_level = (self.selected_level - 1) % total_options
+                elif event.key == pygame.K_DOWN:
+                    self.selected_level = (self.selected_level + 1) % total_options
+                elif event.key == pygame.K_LEFT:
+                    self.selected_level = max(0, self.selected_level - 1)
+                elif event.key == pygame.K_RIGHT:
+                    self.selected_level = min(total_options - 1, self.selected_level + 1)
         return None
 
     def handle_game_over_input(self):
@@ -661,81 +602,68 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-                
-        # Check GPIO buttons for game over screen
-        if (hasattr(self, 'button_select') and self.button_select.is_pressed) or \
-           (hasattr(self, 'button_esc') and self.button_esc.is_pressed):
-            self.reset_game_state()  # Go back to the main menu
-            pygame.time.wait(200)  # Debounce
-            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    self.reset_game_state() # Go back to the main menu
+                elif event.key == pygame.K_ESCAPE: # Also allow ESC to go back
+                     self.reset_game_state()
         return None
 
     def handle_input(self):
         """Handles player input during the game running state."""
         performed_attack_type = None
-
-        # Single Event Loop
+        
+        # Process pygame events first
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game_state = STATE_PAUSED
                     self.selected_pause_option = 0
                     return None
-                
-                # Handle keyboard input for player actions
-                if self.player:
-                    # Add keyboard controls here as fallback
-                    if event.key == pygame.K_LEFT:
-                        self.player.move_left()
-                    elif event.key == pygame.K_RIGHT:
-                        self.player.move_right()
-                    elif event.key == pygame.K_UP:
-                        self.player.jump()
-                    elif event.key == pygame.K_DOWN:
-                        self.player.crouch()
-                    elif event.key == pygame.K_q:  # Q for punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif event.key == pygame.K_w:  # W for kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif event.key == pygame.K_e:  # E for block/dodge
-                        self.player.dodge()
-
-        # Check GPIO buttons for movement and attacks - with safety checks
+        
+        # Process GPIO inputs for the player
         if self.player:
             try:
-                # Only check buttons if they exist and are properly initialized
+                # Movement controls
                 if hasattr(self, 'button_up') and self.button_up and self.button_up.is_pressed:
                     self.player._add_direction_to_buffer('up')
                     self.player.jump()
-                elif hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed:
+                if hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed:
                     self.player._add_direction_to_buffer('down')
                     self.player.crouch()
-                elif hasattr(self, 'button_left') and self.button_left and self.button_left.is_pressed:
+                elif not (hasattr(self, 'button_down') and self.button_down and self.button_down.is_pressed):
+                    self.player.stand()  # Release crouch if button not pressed
+                    
+                if hasattr(self, 'button_left') and self.button_left and self.button_left.is_pressed:
                     self.player._add_direction_to_buffer('left')
                     self.player.move_left()
-                elif hasattr(self, 'button_right') and self.button_right and self.button_right.is_pressed:
+                if hasattr(self, 'button_right') and self.button_right and self.button_right.is_pressed:
                     self.player._add_direction_to_buffer('right')
                     self.player.move_right()
                 
-                # Attack inputs with safety checks
+                # Action buttons
                 if hasattr(self, 'button_punch') and self.button_punch and self.button_punch.is_pressed:
                     performed_attack_type = self.player.attack("punch")
-                elif hasattr(self, 'button_kick') and self.button_kick and self.button_kick.is_pressed:
+                if hasattr(self, 'button_kick') and self.button_kick and self.button_kick.is_pressed:
                     performed_attack_type = self.player.attack("kick")
-                elif hasattr(self, 'button_block') and self.button_block and self.button_block.is_pressed:
+                if hasattr(self, 'button_block') and self.button_block and self.button_block.is_pressed:
                     self.player.dodge()
+                if hasattr(self, 'button_esc') and self.button_esc and self.button_esc.is_pressed:
+                    self.game_state = STATE_PAUSED
+                    self.selected_pause_option = 0
+                    pygame.time.wait(200)  # Debounce
+                    return None
+                    
             except Exception as e:
-                # Log error but continue with gameplay
                 print(f"GPIO input error: {e}")
-
-        # Process attack if any was performed
+        
+        # Process attack if performed
         if performed_attack_type and self.opponent:
             self.handle_attack(self.player, self.opponent, performed_attack_type)
-
+        
         return None
 
     def handle_attack(self, attacker, defender, attack_name):
@@ -847,9 +775,6 @@ class FightingGame:
     def run(self):
         """Main loop for the Fighting Game instance."""
         self.running = True
-        self.initialize_gpio()
-        atexit.register(self.cleanup_gpio)
-
         # Ensure initial state is set (e.g., start menu) if not done in init
         if self.game_state is None: # Add a check just in case
              self.game_state = STATE_START_MENU
@@ -882,9 +807,9 @@ class FightingGame:
                             self.game_state = STATE_START_MENU
                             self.attack_list_scroll_offset = 0 # Reset scroll on exit
                             break
-                        elif self.button_up.is_pressed:
+                        elif event.key == pygame.K_UP:
                             self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                        elif self.button_down.is_pressed:
+                        elif event.key == pygame.K_DOWN:
                             max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
                             self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
                 if action == "QUIT": break
@@ -962,8 +887,8 @@ class FightingGame:
                      if event.type == pygame.QUIT: self.running = False; break
                      if event.type == pygame.KEYDOWN:
                           if event.key == pygame.K_ESCAPE: self.game_state = STATE_GAME_RUNNING # Resume
-                          elif self.button_up.is_pressed: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                          elif self.button_down.is_pressed: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                          elif event.key == pygame.K_UP: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                          elif event.key == pygame.K_DOWN: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
                           elif event.key == pygame.K_RETURN:
                                if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
                                elif self.selected_pause_option == 1: # Quit to Start Menu
@@ -992,8 +917,3 @@ class FightingGame:
         self.winner = None
         self.current_background = None
         print("Fighting game state reset to start menu.")
-        
-import atexit
-
-# Ensure GPIO cleanup on exit
-atexit.register(FightingGame.cleanup_gpio)
