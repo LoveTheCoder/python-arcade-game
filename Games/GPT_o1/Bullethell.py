@@ -4,18 +4,58 @@ import sys
 import math
 import os
 import shutil
-from gpiozero import Button   # Added for GPIO input
+from gpiozero import Button, GPIOZeroError
+import atexit
 
-# GPIO pin mapping
-btn_down    = Button(2)
-btn_left    = Button(3)
-btn_up      = Button(4)
-btn_right   = Button(5)
-btn_esc     = Button(6)
-btn_select  = Button(7)
-btn_action1 = Button(8)
-btn_action2 = Button(9)
-btn_action3 = Button(10)
+# Initialize global GPIO buttons once
+gpio_buttons = None
+shared_gpio_buttons = None
+
+def init_gpio():
+    global gpio_buttons
+    if gpio_buttons is not None:
+        return gpio_buttons  # Return existing buttons if already initialized
+        
+    try:
+        gpio_buttons = {
+            # Directional buttons
+            "button_up": Button(4),
+            "button_down": Button(2),
+            "button_left": Button(3),
+            "button_right": Button(5),
+            # Menu buttons
+            "button_esc": Button(6),
+            "button_select": Button(7),
+            # Action buttons
+            "button_action1": Button(8),  # Primary action (shoot/hit/select)
+            "button_action2": Button(9),  # Secondary action
+            "button_action3": Button(10)  # Tertiary action
+        }
+        print("Bullet Hell: GPIO buttons initialized successfully")
+        return gpio_buttons
+    except Exception as e:
+        print(f"Bullet Hell: Error initializing GPIO: {e}")
+        return None
+
+def set_gpio_buttons(buttons):
+    global shared_gpio_buttons
+    shared_gpio_buttons = buttons
+    print("BulletHell: Received shared GPIO buttons.")
+
+# Clean up GPIO buttons function
+def cleanup_gpio():
+    global gpio_buttons
+    if gpio_buttons:
+        try:
+            for button_name, button in gpio_buttons.items():
+                button.close()
+            gpio_buttons = None
+            print("Bullet Hell: GPIO cleaned up")
+        except Exception as e:
+            print(f"Bullet Hell: Error cleaning up GPIO: {e}")
+
+# Register cleanup at exit
+atexit.register(cleanup_gpio)
 
 # Get the directory of the current Python file
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -353,12 +393,16 @@ class Player(pygame.sprite.Sprite):
         self.speedy = 0
         self.base_speed = 5  # Base movement speed
         self.lives = 3
-        self.score = 0
+        self.score = 0  # Add score attribute
+
         # Power-up variables
-        self.power_level = 1
+        self.power_level = 1  # Ranges from 0 to 10
         self.pp_collected = 0
-        self.pp_needed = 5
-        self.continued_run = False
+        self.pp_needed = 5  # Number of pp needed for next power-up
+
+        self.continued_run = False  # Add this line
+
+        self.gpio_buttons = shared_gpio_buttons
 
         if level == 10:
             pygame.draw.circle(player_image, BLACK, (15, 15), 15)  # Black circle
@@ -367,17 +411,51 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         self.speedx = 0
         self.speedy = 0
-
-        # Read movement from GPIO buttons
-        if btn_left.is_pressed:
-            self.speedx = -self.base_speed
-        if btn_right.is_pressed:
-            self.speedx = self.base_speed
-        if btn_up.is_pressed:
-            self.speedy = -self.base_speed
-        if btn_down.is_pressed:
-            self.speedy = self.base_speed
-
+        
+        gpio_buttons = self.gpio_buttons
+        if gpio_buttons:
+            try:
+                if gpio_buttons["button_left"].is_pressed:
+                    self.speedx = -self.base_speed
+                if gpio_buttons["button_right"].is_pressed:
+                    self.speedx = self.base_speed
+                if gpio_buttons["button_up"].is_pressed:
+                    self.speedy = -self.base_speed
+                if gpio_buttons["button_down"].is_pressed:
+                    self.speedy = self.base_speed
+                if gpio_buttons["button_action1"].is_pressed:
+                    self.shoot()
+                if gpio_buttons["button_action2"].is_pressed:
+                    self.speedx *= 0.4
+                    self.speedy *= 0.4
+            except Exception as e:
+                print(f"Error reading shared GPIO buttons: {e}")
+        
+        # Fall back to keyboard controls
+        key_state = pygame.key.get_pressed()
+        
+        # Only use keyboard if GPIO didn't set speed
+        if self.speedx == 0:
+            if key_state[pygame.K_LEFT]:
+                self.speedx = -self.base_speed
+            if key_state[pygame.K_RIGHT]:
+                self.speedx = self.base_speed
+        
+        if self.speedy == 0:
+            if key_state[pygame.K_UP]:
+                self.speedy = -self.base_speed
+            if key_state[pygame.K_DOWN]:
+                self.speedy = self.base_speed
+        
+        # Check if SHIFT key is held down to decrease speed
+        if key_state[pygame.K_LSHIFT] or key_state[pygame.K_RSHIFT]:
+            self.speedx *= 0.4
+            self.speedy *= 0.4
+        
+        # Keyboard shooting if not already triggered by GPIO
+        if key_state[pygame.K_z] and not (gpio_buttons and gpio_buttons["button_action1"].is_pressed):
+            self.shoot()
+        
         self.rect.x += self.speedx
         self.rect.y += self.speedy
 
@@ -390,10 +468,6 @@ class Player(pygame.sprite.Sprite):
             self.rect.top = 0
         if self.rect.bottom > SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
-
-        # Shooting: use any action button (pins 8, 9 or 10)
-        if btn_action1.is_pressed or btn_action2.is_pressed or btn_action3.is_pressed:
-            self.shoot()
 
     def shoot(self):
         now = pygame.time.get_ticks()
@@ -1036,19 +1110,51 @@ def start_menu(screen, font, clock):
     selected = 0
     # Use a larger neon font for the title
     title_font = pygame.font.SysFont("Arial", 72, bold=True)
+    
+    # Try to get or initialize GPIO buttons
+    try:
+        gpio_buttons = globals().get('gpio_buttons', None)
+        if not gpio_buttons:
+            gpio_buttons = init_gpio()
+            globals()['gpio_buttons'] = gpio_buttons
+    except Exception as e:
+        print(f"Error accessing GPIO in menu: {e}")
+        gpio_buttons = None
+    
+    # For button debouncing
+    last_button_time = 0
+    debounce_time = 200  # milliseconds
+    
     while True:
+        current_time = pygame.time.get_ticks()
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP or btn_up.is_pressed:
+                if event.key == pygame.K_UP:
                     selected = (selected - 1) % len(options)
-                elif event.key == pygame.K_DOWN or btn_down.is_pressed:
+                elif event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(options)
-                elif event.key == pygame.K_RETURN or btn_select.is_pressed:
+                elif event.key == pygame.K_RETURN:
                     return options[selected]
-        # Draw static menu background
+        
+        # Handle GPIO input with debouncing
+        if gpio_buttons and current_time - last_button_time > debounce_time:
+            try:
+                if gpio_buttons["button_up"].is_pressed:
+                    selected = (selected - 1) % len(options)
+                    last_button_time = current_time
+                elif gpio_buttons["button_down"].is_pressed:
+                    selected = (selected + 1) % len(options)
+                    last_button_time = current_time
+                elif gpio_buttons["button_select"].is_pressed or gpio_buttons["button_action1"].is_pressed:
+                    return options[selected]
+            except Exception as e:
+                print(f"Error reading GPIO in menu: {e}")
+        
+        # Rest of the drawing code remains the same
         draw_menu_background(screen)
         
         # Add a semi-transparent overlay for a cyberpunk effect
@@ -1071,8 +1177,9 @@ def start_menu(screen, font, clock):
             option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + i * 40))
             screen.blit(option_text, option_rect)
             
-        # Draw instruction line with neon accent
-        instr_text = font.render("Use UP/DOWN & ENTER", True, (255, 105, 180))
+        # Update instructions to include GPIO buttons
+        controls_text = "Use UP/DOWN & ENTER or GPIO Buttons"
+        instr_text = font.render(controls_text, True, (255, 105, 180))
         instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
         screen.blit(instr_text, instr_rect)
         
@@ -1081,11 +1188,13 @@ def start_menu(screen, font, clock):
 
 class BulletHellGame:
     def __init__(self):
-        # Initialize game attributes
         self.running = True
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Bullet Hell")
         self.clock = pygame.time.Clock()
+        # Use the shared instance
+        set_gpio_buttons(gpio_buttons)
+        self.init_game()
         
         # Initialize game objects and variables
         self.init_game()
@@ -1103,7 +1212,7 @@ class BulletHellGame:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE or btn_esc.is_pressed:
+                if event.key == pygame.K_ESCAPE:
                     self.running = False
 
     def run(self):
@@ -1130,11 +1239,11 @@ class BulletHellGame:
                     return
                 elif event.type == pygame.KEYDOWN:
                     if game_over:
-                        if event.key == pygame.K_m or btn_esc.is_pressed:
+                        if event.key == pygame.K_m:
                             self.running = False  # Exit to start menu
-                        elif event.key == pygame.K_r or btn_action2.is_pressed:
+                        elif event.key == pygame.K_r:
                             reset_game(False)
-                        elif event.key == pygame.K_c or btn_action3.is_pressed:
+                        elif event.key == pygame.K_c:
                             reset_game(True)
             if not game_over:
                 # Enemy spawning logic
@@ -1298,26 +1407,67 @@ class BulletHellGame:
 def main():
     global game_over, boss_spawned, boss_active, level_complete, level, game_won
     global wave_number, wave_start_time, level_start_time
+    
+    # Initialize GPIO buttons
+    gpio_buttons = init_gpio()
+    globals()['gpio_buttons'] = gpio_buttons
+    set_gpio_buttons(gpio_buttons)
+    
     running = True
     wave_start_time = pygame.time.get_ticks()
     level_start_time = pygame.time.get_ticks()
+    
+    # For button debouncing
+    last_esc_time = 0
+    debounce_time = 200  # milliseconds
+    
     while running:
         clock.tick(FPS)
         now = pygame.time.get_ticks()
+        
+        # Process pygame events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN and game_over:
-                if event.key == pygame.K_m or btn_esc.is_pressed:
-                    running = False  # Break out to return to the start menu
-                elif game_won:
-                    if event.key == pygame.K_r or btn_action2.is_pressed:
-                        reset_game(False)
-                else:
-                    if event.key == pygame.K_r or btn_action2.is_pressed:
-                        reset_game(False)
-                    elif event.key == pygame.K_c or btn_action3.is_pressed:
-                        reset_game(True)
+            elif event.type == pygame.KEYDOWN:
+                if game_over:
+                    if event.key == pygame.K_m:
+                        running = False  # Break out to return to the start menu
+                    elif game_won:
+                        if event.key == pygame.K_r:
+                            reset_game(False)
+                    else:
+                        if event.key == pygame.K_r:
+                            reset_game(False)
+                        elif event.key == pygame.K_c:
+                            reset_game(True)
+                elif event.key == pygame.K_ESCAPE:
+                    game_over = True  # Use ESC to end game or pause
+        
+        # Process GPIO events with debouncing
+        if gpio_buttons and now - last_esc_time > debounce_time:
+            try:
+                if not game_over and gpio_buttons["button_esc"].is_pressed:
+                    game_over = True
+                    last_esc_time = now
+                elif game_over:
+                    if gpio_buttons["button_select"].is_pressed:
+                        running = False  # Return to menu
+                        last_esc_time = now
+                    elif gpio_buttons["button_action1"].is_pressed:
+                        # Restart or continue based on context
+                        if game_won:
+                            reset_game(False)
+                        else:
+                            reset_game(False)  # Default to restart
+                        last_esc_time = now
+                    elif gpio_buttons["button_action2"].is_pressed and not game_won:
+                        reset_game(True)  # Continue (action2 is like "c" key)
+                        last_esc_time = now
+            except Exception as e:
+                print(f"Error reading GPIO in main loop: {e}")
+                
+        # Rest of the game loop remains unchanged
         if not game_over:
             all_sprites.update()
 
@@ -1393,10 +1543,6 @@ def main():
                     player.power_up()
 
             for bullet in enemy_bullets:
-                if not bullet.grazed:
-                    if bullet.rect.colliderect(player.rect):
-                        if not bullet.rect.collidepoint(player.rect.center):
-                            bullet.grazed = True
                             point = Point(bullet.rect.centerx, bullet.rect.centery, 5000)
                             all_sprites.add(point)
                             points.add(point)

@@ -19,12 +19,12 @@ sys.path.append(os.path.join(GAMES_DIR, 'Claude'))
 sys.path.append(os.path.join(GAMES_DIR, 'Gemini', 'Fighting'))  # Corrected path
 
 # Import the games
-from Games.GPT_o1.Bullethell import BulletHellGame
+from Games.GPT_o1.Bullethell import BulletHellGame, set_gpio_buttons
 from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
 
 class GameMenu:
-    def __init__(self, screen, clock):
+    def __init__(self, screen, clock, gpio_buttons=None):
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 480
         self.screen = screen
@@ -50,19 +50,12 @@ class GameMenu:
         self.clock = clock
 
         # Initialize GPIO buttons using gpiozero if available.
-        if Button:
-            self.gpio_buttons = {
-                'down': Button(2, pull_up=True, bounce_time=0.1),
-                'left': Button(3, pull_up=True, bounce_time=0.1),
-                'up': Button(4, pull_up=True, bounce_time=0.1),
-                'right': Button(5, pull_up=True, bounce_time=0.1),
-                'esc': Button(6, pull_up=True, bounce_time=0.1),
-                'select': Button(7, pull_up=True, bounce_time=0.1)
-            }
+        self.gpio_buttons = gpio_buttons
+        if self.gpio_buttons:
             # Last state for each GPIO button to detect rising edge
             self.last_gpio_state = {name: False for name in self.gpio_buttons}
         else:
-            self.gpio_buttons = None
+            self.last_gpio_state = None
 
     def draw_background(self):
         # Retro styled background: vertical gradient only.
@@ -170,7 +163,7 @@ class GameMenu:
         return None
 
     def run(self):
-        bullet_hell_game = BulletHellGame()  # if these work correctly
+        bullet_hell_game = BulletHellGame(gpio_buttons=self.gpio_buttons)
         while self.running:
             if self.in_menu:
                 self.draw_menu()
@@ -193,9 +186,33 @@ class GameMenu:
                 self.clock.tick(60)
         pygame.quit()
 
-if __name__ == "__main__":
+def main():
+    # Initialize the GPIO buttons in main.py (if available)
+    gpio_buttons = None
+    if Button:
+        try:
+            gpio_buttons = {
+                'up': Button(4, pull_up=True, bounce_time=0.1),
+                'down': Button(2, pull_up=True, bounce_time=0.1),
+                'left': Button(3, pull_up=True, bounce_time=0.1),
+                'right': Button(5, pull_up=True, bounce_time=0.1),
+                'esc': Button(6, pull_up=True, bounce_time=0.1),
+                'select': Button(7, pull_up=True, bounce_time=0.1),
+                'action1': Button(8, pull_up=True, bounce_time=0.1),
+                'action2': Button(9, pull_up=True, bounce_time=0.1),
+                'action3': Button(10, pull_up=True, bounce_time=0.1)
+            }
+            print("Main: GPIO buttons initialized successfully")
+        except Exception as e:
+            print(f"Main: Error initializing GPIO buttons: {e}")
+    # Pass the initialized gpio_buttons to your game modules
+    set_gpio_buttons(gpio_buttons)
+
     pygame.init()
     screen = pygame.display.set_mode((800, 480))
     clock = pygame.time.Clock()
-    menu = GameMenu(screen, clock)
+    menu = GameMenu(screen, clock, gpio_buttons)
     menu.run()
+
+if __name__ == "__main__":
+    main()
