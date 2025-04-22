@@ -5,6 +5,7 @@ import random
 import subprocess
 from gpiozero import Button  # Import Button class from gpiozero
 from signal import pause  # For handling GPIO events
+import atexit  # Ensure cleanup on exit
 
 # GPIO Pin Configuration
 def initialize_gpio():
@@ -24,6 +25,9 @@ def cleanup_gpio(buttons):
 # Initialize GPIO buttons
 gpio_buttons = initialize_gpio()
 
+# Ensure GPIO cleanup on exit
+atexit.register(lambda: cleanup_gpio(gpio_buttons))
+
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
 
@@ -38,10 +42,11 @@ from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
 
 class GameMenu:
-    def __init__(self, screen, clock):
+    def __init__(self, screen, clock, gpio_buttons):
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 480
         self.screen = screen
+        self.gpio_buttons = gpio_buttons  # Store GPIO buttons
         pygame.display.set_caption("Game Menu")
         
         # Colors
@@ -137,15 +142,15 @@ class GameMenu:
 
     def handle_input(self):
         # Check GPIO button states for navigation
-        if gpio_buttons["button_up"].is_pressed:  # Up
+        if self.gpio_buttons["button_up"].is_pressed:  # Up
             self.selected = (self.selected - 1) % len(self.options)
             pygame.time.wait(200)  # Debounce delay
-        elif gpio_buttons["button_down"].is_pressed:  # Down
+        elif self.gpio_buttons["button_down"].is_pressed:  # Down
             self.selected = (self.selected + 1) % len(self.options)
             pygame.time.wait(200)  # Debounce delay
-        elif gpio_buttons["button_right"].is_pressed:  # Right (Enter equivalent)
+        elif self.gpio_buttons["button_right"].is_pressed:  # Right (Enter equivalent)
             return self.options[self.selected]
-        elif gpio_buttons["button_left"].is_pressed:  # Left (Escape equivalent)
+        elif self.gpio_buttons["button_left"].is_pressed:  # Left (Escape equivalent)
             return "MENU"
         return None
 
@@ -157,14 +162,13 @@ class GameMenu:
                 action = self.handle_input()
                 if action == "Bullet Hell":
                     # Release GPIO pins used by the main menu
-                    cleanup_gpio(gpio_buttons)
+                    cleanup_gpio(self.gpio_buttons)
 
                     self.in_menu = False
                     bullet_hell_game.run()
 
                     # Reinitialize GPIO pins for the main menu after the game ends
-                    global gpio_buttons
-                    gpio_buttons = initialize_gpio()
+                    self.gpio_buttons = initialize_gpio()
 
                     self.in_menu = True
                 elif action == "Rhythm Game":
@@ -180,15 +184,10 @@ class GameMenu:
                     self.running = False
                 self.clock.tick(60)
         pygame.quit()
-        
-import atexit
-
-# Ensure GPIO cleanup on exit
-atexit.register(lambda: cleanup_gpio(gpio_buttons))
 
 if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((800, 480))
     clock = pygame.time.Clock()
-    menu = GameMenu(screen, clock)
+    menu = GameMenu(screen, clock, gpio_buttons)
     menu.run()
