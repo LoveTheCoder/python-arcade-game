@@ -6,12 +6,16 @@ import os
 import shutil
 from gpiozero import Button  # Import Button class from gpiozero
 from signal import pause  # For handling GPIO events
+import atexit
 
-# GPIO Pin Configuration
-button_up = Button(4)    # GPIO pin 4 for "Up"
-button_down = Button(2)  # GPIO pin 2 for "Down"
-button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
-button_right = Button(5)
+gpio_initialized = False
+
+if not gpio_initialized:
+    button_up = Button(4)
+    button_down = Button(2)
+    button_left = Button(3)
+    button_right = Button(5)
+    gpio_initialized = True
 
 #test
 
@@ -1113,13 +1117,19 @@ class BulletHellGame:
                     self.running = False
 
     def run(self):
-        while True:
-            menu_choice = start_menu(self.screen, font, self.clock)
-            if menu_choice == "Return to Main Menu":
-                return  # Return control back to main.py
-            reset_game(False)  # Reset game state before a new session
-            self.running = True
-            self.game_loop()  # Run one game session
+        try:
+            while True:
+                menu_choice = start_menu(self.screen, font, self.clock)
+                if menu_choice == "Return to Main Menu":
+                    cleanup_gpio()  # Clean up GPIO before returning to the main menu
+                    return
+                reset_game(False)  # Reset game state before a new session
+                self.running = True
+                self.game_loop()  # Run one game session
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            cleanup_gpio()  # Ensure GPIO cleanup on any error or exit
             
     def game_loop(self):
         global game_over, boss_spawned, boss_active, level_complete, level, game_won
@@ -1447,8 +1457,6 @@ def main():
             else:
                 display_game_over()
     return  # Removed sys.exit() to allow proper return to the start menu
-
-import atexit
 
 # Ensure GPIO cleanup on exit
 def cleanup_gpio():
