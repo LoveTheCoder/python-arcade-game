@@ -415,17 +415,17 @@ class Player(pygame.sprite.Sprite):
         gpio_buttons = self.gpio_buttons
         if gpio_buttons:
             try:
-                if gpio_buttons["button_left"].is_pressed:
+                if gpio_buttons["left"].is_pressed:
                     self.speedx = -self.base_speed
-                if gpio_buttons["button_right"].is_pressed:
+                if gpio_buttons["right"].is_pressed:
                     self.speedx = self.base_speed
-                if gpio_buttons["button_up"].is_pressed:
+                if gpio_buttons["up"].is_pressed:
                     self.speedy = -self.base_speed
-                if gpio_buttons["button_down"].is_pressed:
+                if gpio_buttons["down"].is_pressed:
                     self.speedy = self.base_speed
-                if gpio_buttons["button_action1"].is_pressed:
+                if gpio_buttons["action1"].is_pressed:
                     self.shoot()
-                if gpio_buttons["button_action2"].is_pressed:
+                if gpio_buttons["action2"].is_pressed:
                     self.speedx *= 0.4
                     self.speedy *= 0.4
             except Exception as e:
@@ -453,7 +453,7 @@ class Player(pygame.sprite.Sprite):
             self.speedy *= 0.4
         
         # Keyboard shooting if not already triggered by GPIO
-        if key_state[pygame.K_z] and not (gpio_buttons and gpio_buttons["button_action1"].is_pressed):
+        if key_state[pygame.K_z] and not (gpio_buttons and gpio_buttons["action1"].is_pressed):
             self.shoot()
         
         self.rect.x += self.speedx
@@ -952,7 +952,7 @@ def display_game_over():
     # Draw central cyberpunk-style message
     title = font.render("GAME OVER", True, (255, 20, 147))
     score_text = font.render(f"Final Score: {player.score:,}", True, WHITE)
-    instr_text = font.render("Press R to Restart, C to Continue, M for Menu", True, (0, 255, 255))
+    instr_text = font.render("Press ACTION1 to Restart, ACTION2 to Continue, ACTION3 for Menu", True, (0, 255, 255))
     
     title_rect = title.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60))
     score_rect = score_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
@@ -979,7 +979,7 @@ def display_game_won():
     else:
         status_text = font.render("Legitimate Clear!", True, GREEN)
         
-    instr_text = font.render("Press R to Play Again, M for Menu", True, (255, 105, 180))
+    instr_text = font.render("Press ACTION1 to Restart or ACTION3 for Menu", True, (255, 105, 180))
     
     title_rect = title_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80))
     score_rect = score_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20))
@@ -1143,13 +1143,13 @@ def start_menu(screen, font, clock):
         # Handle GPIO input with debouncing
         if gpio_buttons and current_time - last_button_time > debounce_time:
             try:
-                if gpio_buttons["button_up"].is_pressed:
+                if gpio_buttons["up"].is_pressed:
                     selected = (selected - 1) % len(options)
                     last_button_time = current_time
-                elif gpio_buttons["button_down"].is_pressed:
+                elif gpio_buttons["down"].is_pressed:
                     selected = (selected + 1) % len(options)
                     last_button_time = current_time
-                elif gpio_buttons["button_select"].is_pressed or gpio_buttons["button_action1"].is_pressed:
+                elif gpio_buttons["select"].is_pressed or gpio_buttons["action1"].is_pressed:
                     return options[selected]
             except Exception as e:
                 print(f"Error reading GPIO in menu: {e}")
@@ -1178,7 +1178,7 @@ def start_menu(screen, font, clock):
             screen.blit(option_text, option_rect)
             
         # Update instructions to include GPIO buttons
-        controls_text = "Use UP/DOWN & ENTER or GPIO Buttons"
+        controls_text = "Use GPIO: UP/DOWN to navigate, ACTION1 to select"
         instr_text = font.render(controls_text, True, (255, 105, 180))
         instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
         screen.blit(instr_text, instr_rect)
@@ -1447,22 +1447,18 @@ def main():
         # Process GPIO events with debouncing
         if gpio_buttons and now - last_esc_time > debounce_time:
             try:
-                if not game_over and gpio_buttons["button_esc"].is_pressed:
+                if not game_over and gpio_buttons["esc"].is_pressed:
                     game_over = True
                     last_esc_time = now
                 elif game_over:
-                    if gpio_buttons["button_select"].is_pressed:
+                    if gpio_buttons["action3"].is_pressed:
                         running = False  # Return to menu
                         last_esc_time = now
-                    elif gpio_buttons["button_action1"].is_pressed:
-                        # Restart or continue based on context
-                        if game_won:
-                            reset_game(False)
-                        else:
-                            reset_game(False)  # Default to restart
+                    elif gpio_buttons["action1"].is_pressed:
+                        reset_game(False)
                         last_esc_time = now
-                    elif gpio_buttons["button_action2"].is_pressed and not game_won:
-                        reset_game(True)  # Continue (action2 is like "c" key)
+                    elif gpio_buttons["action2"].is_pressed and not game_won:
+                        reset_game(True)
                         last_esc_time = now
             except Exception as e:
                 print(f"Error reading GPIO in main loop: {e}")
