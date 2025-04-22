@@ -3,16 +3,14 @@ import sys
 import os
 import random
 import subprocess
-import RPi.GPIO as GPIO  # Import GPIO library
+from gpiozero import Button  # Import Button class from gpiozero
+from signal import pause  # For handling GPIO events
 
 # GPIO Pin Configuration
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
-GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
-
-# Removed update_game_from_github and configure_wifi functions
+button_up = Button(4)    # GPIO pin 4 for "Up"
+button_down = Button(2)  # GPIO pin 2 for "Down"
+button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
+button_right = Button(5) # GPIO pin 5 for "Right" (Enter/Select)
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -126,19 +124,17 @@ class GameMenu:
         pygame.display.flip()
 
     def handle_input(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == GPIO.input(4):
-                    self.selected = (self.selected - 1) % len(self.options)
-                elif event.key == GPIO.input(2):
-                    self.selected = (self.selected + 1) % len(self.options)
-                elif event.key == pygame.K_RETURN:
-                    return self.options[self.selected]
-                elif event.key == pygame.K_ESCAPE:
-                    return "MENU"
+        # Check GPIO button states for navigation
+        if button_up.is_pressed:  # Up
+            self.selected = (self.selected - 1) % len(self.options)
+            pygame.time.wait(200)  # Debounce delay
+        elif button_down.is_pressed:  # Down
+            self.selected = (self.selected + 1) % len(self.options)
+            pygame.time.wait(200)  # Debounce delay
+        elif button_right.is_pressed:  # Right (Enter equivalent)
+            return self.options[self.selected]
+        elif button_left.is_pressed:  # Left (Escape equivalent)
+            return "MENU"
         return None
 
     def run(self):

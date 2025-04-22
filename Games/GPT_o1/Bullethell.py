@@ -4,14 +4,14 @@ import sys
 import math
 import os
 import shutil
-import RPi.GPIO as GPIO  # Import GPIO library
+from gpiozero import Button  # Import Button class from gpiozero
+from signal import pause  # For handling GPIO events
 
 # GPIO Pin Configuration
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
-GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
+button_up = Button(4)    # GPIO pin 4 for "Up"
+button_down = Button(2)  # GPIO pin 2 for "Down"
+button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
+button_right = Button(5)
 
 #test
 
@@ -375,13 +375,13 @@ class Player(pygame.sprite.Sprite):
         else:
             self.base_speed = 5  # Reset to base speed
         
-        if key_state[GPIO.input(3)]:
+        if button_left.is_pressed:
             self.speedx = -self.base_speed
-        if key_state[GPIO.input(5)]:
+        if button_right.is_pressed:
             self.speedx = self.base_speed
-        if key_state[GPIO.input(4)]:
+        if button_up.is_pressed:
             self.speedy = -self.base_speed
-        if key_state[GPIO.input(2)]:
+        if button_down.is_pressed:
             self.speedy = self.base_speed
         
         self.rect.x += self.speedx
@@ -1048,9 +1048,9 @@ def start_menu(screen, font, clock):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == GPIO.input(4):
+                if button_up.is_pressed:
                     selected = (selected - 1) % len(options)
-                elif event.key == GPIO.input(2):
+                elif button_down.is_pressed:
                     selected = (selected + 1) % len(options)
                 elif event.key == pygame.K_RETURN:
                     return options[selected]

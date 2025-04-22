@@ -5,14 +5,14 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
-import RPi.GPIO as GPIO  # Import GPIO library
+from gpiozero import Button  # Import Button class from gpiozero
+from signal import pause  # For handling GPIO events
 
 # GPIO Pin Configuration
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
-GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
+button_up = Button(4)    # GPIO pin 4 for "Up"
+button_down = Button(2)  # GPIO pin 2 for "Down"
+button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
+button_right = Button(5)
 
 # Add Game States
 STATE_START_MENU = 0
@@ -521,9 +521,9 @@ class FightingGame:
                 self.running = False
                 return "QUIT"  # Signal exit
             if event.type == pygame.KEYDOWN:
-                if event.key == GPIO.input(4):
+                if button_up.is_pressed:
                     self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif event.key == GPIO.input(2):
+                elif button_down.is_pressed:
                     self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
                 elif event.key == pygame.K_RETURN:
                     if self.selected_start_option == 0:  # Start Game -> Go to Level Select
@@ -553,13 +553,13 @@ class FightingGame:
                 elif event.key == pygame.K_RETURN:
                     self.initialize_game_session(self.selected_level)
                     return None # Stay in game loop, state changed
-                elif event.key == GPIO.input(4):
+                elif button_up.is_pressed:
                     self.selected_level = (self.selected_level - 1) % total_options
-                elif event.key == GPIO.input(2):
+                elif button_down.is_pressed:
                     self.selected_level = (self.selected_level + 1) % total_options
-                elif event.key == GPIO.input(3):
+                elif button_left.is_pressed:
                     self.selected_level = max(0, self.selected_level - 1)
-                elif event.key == GPIO.input(5):
+                elif button_right.is_pressed:
                     self.selected_level = min(total_options - 1, self.selected_level + 1)
         return None
 
@@ -595,16 +595,16 @@ class FightingGame:
                 # Actions triggered on key press
                 if self.player:
                     # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if event.key == GPIO.input(4):
+                    if button_up.is_pressed:
                         self.player._add_direction_to_buffer('up')
                         self.player.jump() # Still trigger jump action
-                    elif event.key == GPIO.input(2):
+                    elif button_down.is_pressed:
                         self.player._add_direction_to_buffer('down')
                         self.player.crouch() # Still trigger crouch action
-                    elif event.key == GPIO.input(3):
+                    elif button_left.is_pressed:
                          self.player._add_direction_to_buffer('left')
                          # Movement itself is handled by get_pressed below
-                    elif event.key == GPIO.input(5):
+                    elif button_right.is_pressed:
                          self.player._add_direction_to_buffer('right')
                          # Movement itself is handled by get_pressed below
                     # --- End Buffer Input ---
@@ -619,16 +619,16 @@ class FightingGame:
 
             if event.type == pygame.KEYUP:
                 # Stop crouching when DOWN key is released
-                if self.player and event.key == GPIO.input(2):
+                if self.player and button_down.is_pressed:
                     self.player.stand()
 
         # --- Continuous Movement (outside event loop, uses get_pressed) ---
         # This block now ONLY handles the actual movement, not buffer input
         if self.player and self.game_state == STATE_GAME_RUNNING:
             keys = pygame.key.get_pressed()
-            if keys[GPIO.input(3)]:
+            if button_left.is_pressed:
                 self.player.move_left() # Call movement method
-            if keys[GPIO.input(5)]:
+            if button_right.is_pressed:
                 self.player.move_right() # Call movement method
 
         # --- Process Attack (if any was performed) ---
@@ -778,9 +778,9 @@ class FightingGame:
                             self.game_state = STATE_START_MENU
                             self.attack_list_scroll_offset = 0 # Reset scroll on exit
                             break
-                        elif event.key == GPIO.input(4):
+                        elif button_up.is_pressed:
                             self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                        elif event.key == GPIO.input(2):
+                        elif button_down.is_pressed:
                             max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
                             self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
                 if action == "QUIT": break
@@ -858,8 +858,8 @@ class FightingGame:
                      if event.type == pygame.QUIT: self.running = False; break
                      if event.type == pygame.KEYDOWN:
                           if event.key == pygame.K_ESCAPE: self.game_state = STATE_GAME_RUNNING # Resume
-                          elif event.key == GPIO.input(4): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                          elif event.key == GPIO.input(2): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                          elif button_up.is_pressed: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                          elif button_down.is_pressed: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
                           elif event.key == pygame.K_RETURN:
                                if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
                                elif self.selected_pause_option == 1: # Quit to Start Menu

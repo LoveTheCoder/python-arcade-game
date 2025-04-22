@@ -4,14 +4,14 @@ import random
 import numpy as np
 import json
 import math
-import RPi.GPIO as GPIO  # Import GPIO library
+from gpiozero import Button  # Import Button class from gpiozero
+from signal import pause  # For handling GPIO events
 
 # GPIO Pin Configuration
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(2, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Down
-GPIO.setup(3, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Left
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Up
-GPIO.setup(5, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Right
+button_up = Button(4)    # GPIO pin 4 for "Up"
+button_down = Button(2)  # GPIO pin 2 for "Down"
+button_left = Button(3)  # GPIO pin 3 for "Left" (Escape/Menu)
+button_right = Button(5)
 
 running = True
 
@@ -531,20 +531,20 @@ def render(screen, game_state, notes, score_tracker, menu_font):
 
 def handle_menu_input(event, game_state):
     """Handle menu navigation input"""
-    if event.key == GPIO.input(4):
+    if button_up.is_pressed:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
         # No change for menu item 2 (speed) or 3 (exit)
-    elif event.key == GPIO.input(2):
+    elif button_down.is_pressed:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty + 1) % len(game_state.difficulties)
-    elif event.key == GPIO.input(3) and game_state.selected_menu_item == 2:
+    elif button_left.is_pressed and game_state.selected_menu_item == 2:
         game_state.scroll_speed = max(MIN_SCROLL_SPEED, game_state.scroll_speed - 1)
-    elif event.key == GPIO.input(5) and game_state.selected_menu_item == 2:
+    elif button_right.is_pressed and game_state.selected_menu_item == 2:
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
     elif event.key == pygame.K_TAB:
         game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4  # Now 4 items (0,1,2,3)
@@ -613,9 +613,9 @@ def main():
                         handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
                 
                 elif game_state.current_state == STATE_PAUSE:
-                    if event.key == GPIO.input(4):
+                    if button_up.is_pressed:
                         game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
-                    elif event.key == GPIO.input(2):
+                    elif button_down.is_pressed:
                         game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
                     elif event.key == pygame.K_RETURN:
                         if game_state.selected_pause_option == 0:  # Restart
