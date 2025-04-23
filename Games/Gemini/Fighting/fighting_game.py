@@ -614,11 +614,10 @@ class FightingGame:
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if self.gpio_states.get("select"):
-                    self.reset_game_state()  # Go back to the main menu
-                elif self.gpio_states.get("esc"):  # Also allow ESC to go back
-                    self.reset_game_state()
+            if self.gpio_states.get("select"):
+                self.reset_game_state()  # Go back to the main menu
+            elif self.gpio_states.get("esc"):  # Also allow ESC to go back
+                self.reset_game_state()
         return None
 
     def handle_input(self):
@@ -814,20 +813,20 @@ class FightingGame:
             elif self.game_state == STATE_ATTACK_LIST:
                 self.draw_attack_list()
                 # Handle input for attack list screen (including scrolling)
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                for event in pygame.event.get([pygame.QUIT]):
                     self.update_gpio_states()  # Update GPIO states dynamically
                     if event.type == pygame.QUIT:
                         self.running = False; action = "QUIT"; break
-                    if event.type == pygame.KEYDOWN:
-                        if self.gpio_states.get("esc"):
-                            self.game_state = STATE_START_MENU
-                            self.attack_list_scroll_offset = 0 # Reset scroll on exit
-                            break
-                        elif self.gpio_states.get("up"):
-                            self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                        elif self.gpio_states.get("down"):
-                            max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
-                            self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
+                    #if event.type == pygame.KEYDOWN:
+                    if self.gpio_states.get("esc"):
+                        self.game_state = STATE_START_MENU
+                        self.attack_list_scroll_offset = 0 # Reset scroll on exit
+                        break
+                    elif self.gpio_states.get("up"):
+                        self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
+                    elif self.gpio_states.get("down"):
+                        max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
+                        self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
                 if action == "QUIT": break
 
             elif self.game_state == STATE_GAME_RUNNING:
@@ -900,16 +899,16 @@ class FightingGame:
                     self.screen.blit(option_text, option_rect)
                 # Handle pause input
                 for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                     self.update_gpio_states()  # Update GPIO states dynamically
-                     if event.type == pygame.QUIT: self.running = False; break
-                     if event.type == pygame.KEYDOWN:
-                          if self.gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING # Resume
-                          elif self.gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                          elif self.gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                          elif self.gpio_states.get("select"):
-                               if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
-                               elif self.selected_pause_option == 1: # Quit to Start Menu
-                                    self.reset_game_state() # Reset to fighting game start menu
+                    self.update_gpio_states()  # Update GPIO states dynamically
+                    if event.type == pygame.QUIT: self.running = False; break
+                    #if event.type == pygame.KEYDOWN:
+                    if self.gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING # Resume
+                    elif self.gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                    elif self.gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                    elif self.gpio_states.get("select"):
+                        if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
+                        elif self.selected_pause_option == 1: # Quit to Start Menu
+                            self.reset_game_state() # Reset to fighting game start menu
 
             elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
                 self.draw_game_over_screen()
