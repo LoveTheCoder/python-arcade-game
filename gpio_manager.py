@@ -2,15 +2,15 @@ from gpiozero import Button
 
 # GPIO Pin Definitions
 GPIO_PINS = {
-    "down": Button(2, pull_up=False),
-    "left": Button(3, pull_up=False),
-    "up": Button(4, pull_up=False),
-    "right": Button(5, pull_up=False),
-    "esc": Button(6, pull_up=False),
-    "select": Button(7, pull_up=False),
-    "action1": Button(8, pull_up=False),
-    "action2": Button(9, pull_up=False),
-    "action3": Button(10, pull_up=False),
+    "down": Button(2, pull_up=True),
+    "left": Button(3, pull_up=True),
+    "up": Button(4, pull_up=True),
+    "right": Button(5, pull_up=True),
+    "esc": Button(6, pull_up=True),
+    "select": Button(7, pull_up=True),
+    "action1": Button(8, pull_up=True),
+    "action2": Button(9, pull_up=True),
+    "action3": Button(10, pull_up=True),
 }
 
 def read_gpio_input():
