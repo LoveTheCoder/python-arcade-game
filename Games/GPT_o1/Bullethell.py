@@ -1101,13 +1101,17 @@ class BulletHellGame:
                     self.running = False
 
     def run(self):
-        while True:
-            menu_choice = start_menu(self.screen, font, self.clock)
-            if menu_choice == "Return to Main Menu":
-                return  # Return control back to main.py
-            reset_game(False)  # Reset game state before a new session
-            self.running = True
-            self.game_loop()  # Run one game session
+        try:
+            while True:
+                menu_choice = start_menu(self.screen, font, self.clock)
+                if menu_choice == "Return to Main Menu":
+                    return  # Return control back to main.py
+                reset_game(False)  # Reset game state before a new session
+                self.running = True
+                self.game_loop()  # Run one game session
+        except Exception as e:
+            print(f"An error occurred in BulletHellGame: {e}")
+            self.running = False
             
     def game_loop(self):
         gpio_states = read_gpio_input() or {}

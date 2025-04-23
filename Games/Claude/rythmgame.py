@@ -566,122 +566,125 @@ def start_song(game_state):
     game_state.current_state = STATE_PLAY
 
 def main():
-    gpio_states = read_gpio_input() or {}
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("4K Rhythm Game")
-    clock = pygame.time.Clock()
-    
-    resources = ResourceManager()
-    resources.load_game_sounds()
-    game_state = GameState(resources)
-    menu_font = pygame.font.Font(None, 36)
-    
-    running = True
-    while running:
-        events = pygame.event.get()
-        for event in events:
-            if event.type == pygame.QUIT:
-                running = False
-                
-            elif event.type == pygame.KEYDOWN or gpio_states:
-                if game_state.current_state == STATE_MENU:
-                    if gpio_states["select"]:
-                        if game_state.selected_menu_item == 3:
-                            # Selected "Return to Main Menu"
-                            return  # Exit main() so control goes back to main.py
+    try:
+        gpio_states = read_gpio_input() or {}
+        pygame.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("4K Rhythm Game")
+        clock = pygame.time.Clock()
+        
+        resources = ResourceManager()
+        resources.load_game_sounds()
+        game_state = GameState(resources)
+        menu_font = pygame.font.Font(None, 36)
+        
+        running = True
+        while running:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    running = False
+                    
+                elif event.type == pygame.KEYDOWN or gpio_states:
+                    if game_state.current_state == STATE_MENU:
+                        if gpio_states["select"]:
+                            if game_state.selected_menu_item == 3:
+                                # Selected "Return to Main Menu"
+                                return  # Exit main() so control goes back to main.py
+                            else:
+                                # Start the song as before
+                                game_state.current_song = SONGS[game_state.selected_song_index]
+                                melody = game_state.current_song.melody_func()
+                                game_state.music, duration, _ = generate_music(melody)
+                                start_song(game_state)
                         else:
-                            # Start the song as before
-                            game_state.current_song = SONGS[game_state.selected_song_index]
-                            melody = game_state.current_song.melody_func()
-                            game_state.music, duration, _ = generate_music(melody)
-                            start_song(game_state)
-                    else:
-                        handle_menu_input(event, game_state)
-                
-                elif game_state.current_state == STATE_PLAY:
-                    if gpio_states["esc"]:
-                        game_state.current_state = STATE_PAUSE
-                        game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
-                        game_state.music.stop()
-                    elif gpio_states in KEY_MAP:
-                        handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
-                
-                elif game_state.current_state == STATE_PAUSE:
-                    if gpio_states["up"]:
-                        game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
-                    elif gpio_states["down"]:
-                        game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
-                    elif gpio_states["select"]:
-                        if game_state.selected_pause_option == 0:  # Restart
-                            start_song(game_state)
-                        elif game_state.selected_pause_option == 1:  # Exit to Menu
-                            game_state.current_state = STATE_MENU
-                            game_state.notes.empty()
-                            game_state.score_tracker.reset()
+                            handle_menu_input(event, game_state)
+                    
+                    elif game_state.current_state == STATE_PLAY:
+                        if gpio_states["esc"]:
+                            game_state.current_state = STATE_PAUSE
+                            game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
                             game_state.music.stop()
-        
-        # Update game state
-        if game_state.current_state == STATE_PLAY:
-            current_time = pygame.time.get_ticks() - game_state.game_start_time
+                        elif gpio_states in KEY_MAP:
+                            handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
+                    
+                    elif game_state.current_state == STATE_PAUSE:
+                        if gpio_states["up"]:
+                            game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
+                        elif gpio_states["down"]:
+                            game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
+                        elif gpio_states["select"]:
+                            if game_state.selected_pause_option == 0:  # Restart
+                                start_song(game_state)
+                            elif game_state.selected_pause_option == 1:  # Exit to Menu
+                                game_state.current_state = STATE_MENU
+                                game_state.notes.empty()
+                                game_state.score_tracker.reset()
+                                game_state.music.stop()
             
-            # Handle music start delay
-            if game_state.music_start_timer and pygame.time.get_ticks() >= game_state.music_start_timer:
-                game_state.music.play()
-                game_state.music_start_timer = 0
+            # Update game state
+            if game_state.current_state == STATE_PLAY:
+                current_time = pygame.time.get_ticks() - game_state.game_start_time
+                
+                # Handle music start delay
+                if game_state.music_start_timer and pygame.time.get_ticks() >= game_state.music_start_timer:
+                    game_state.music.play()
+                    game_state.music_start_timer = 0
+                
+                # Spawn new notes
+                while game_state.waiting_notes and game_state.waiting_notes[0][0] - (APPROACH_TIME * 1000) <= current_time:
+                    target_time, column = game_state.waiting_notes.pop(0)
+                    new_note = Note(column, game_state.scroll_speed, target_time)
+                    game_state.notes.add(new_note)
+                
+                # Update existing notes
+                for note in game_state.notes:
+                    result = note.update(current_time)
+                    if result == "MISS":
+                        game_state.score_tracker.combo = 0
+                        game_state.score_tracker.misses += 1
+                        game_state.score_tracker.add_hit("MISS", 0)  # Add the miss to score tracking
+                        note.kill()
+                
+                # Check for song completion
+                if (not game_state.waiting_notes and 
+                    not game_state.notes and 
+                    not game_state.music_start_timer and 
+                    current_time >= duration * 1000):
+                    game_state.current_state = STATE_RESULTS
+                    game_state.song_finished = True
             
-            # Spawn new notes
-            while game_state.waiting_notes and game_state.waiting_notes[0][0] - (APPROACH_TIME * 1000) <= current_time:
-                target_time, column = game_state.waiting_notes.pop(0)
-                new_note = Note(column, game_state.scroll_speed, target_time)
-                game_state.notes.add(new_note)
-            
-            # Update existing notes
-            for note in game_state.notes:
-                result = note.update(current_time)
-                if result == "MISS":
-                    game_state.score_tracker.combo = 0
-                    game_state.score_tracker.misses += 1
-                    game_state.score_tracker.add_hit("MISS", 0)  # Add the miss to score tracking
-                    note.kill()
-            
-            # Check for song completion
-            if (not game_state.waiting_notes and 
-                not game_state.notes and 
-                not game_state.music_start_timer and 
-                current_time >= duration * 1000):
-                game_state.current_state = STATE_RESULTS
-                game_state.song_finished = True
-        
-        elif game_state.current_state == STATE_RESULTS:
-            if event.type == pygame.KEYDOWN or gpio_states:
-                if gpio_states["select"]:
-                    # Always return to menu
-                    game_state.current_state = STATE_MENU
-                    game_state.song_finished = False
+            elif game_state.current_state == STATE_RESULTS:
+                if event.type == pygame.KEYDOWN or gpio_states:
+                    if gpio_states["select"]:
+                        # Always return to menu
+                        game_state.current_state = STATE_MENU
+                        game_state.song_finished = False
 
-        # Render current state
-        screen.fill((0, 0, 0))
-        
-        if game_state.current_state == STATE_MENU:
-            draw_menu(screen, menu_font, game_state.difficulties, 
-                     game_state.selected_difficulty, game_state.scroll_speed, 
-                     game_state.selected_song_index, game_state.selected_menu_item)
-        
-        elif game_state.current_state == STATE_PLAY:
-            render(screen, game_state, game_state.notes, game_state.score_tracker, menu_font)
-        
-        elif game_state.current_state == STATE_PAUSE:
-            draw_pause_menu(screen, menu_font, game_state.pause_options, 
-                          game_state.selected_pause_option)
-        
-        elif game_state.current_state == STATE_RESULTS:
-            draw_results_screen(screen, game_state.score_tracker, menu_font)
-        
-        pygame.display.flip()
-        clock.tick(60)
+            # Render current state
+            screen.fill((0, 0, 0))
+            
+            if game_state.current_state == STATE_MENU:
+                draw_menu(screen, menu_font, game_state.difficulties, 
+                         game_state.selected_difficulty, game_state.scroll_speed, 
+                         game_state.selected_song_index, game_state.selected_menu_item)
+            
+            elif game_state.current_state == STATE_PLAY:
+                render(screen, game_state, game_state.notes, game_state.score_tracker, menu_font)
+            
+            elif game_state.current_state == STATE_PAUSE:
+                draw_pause_menu(screen, menu_font, game_state.pause_options, 
+                              game_state.selected_pause_option)
+            
+            elif game_state.current_state == STATE_RESULTS:
+                draw_results_screen(screen, game_state.score_tracker, menu_font)
+            
+            pygame.display.flip()
+            clock.tick(60)
 
-    pygame.quit()
+        pygame.quit()
+    except Exception as e:
+        print(f"An error occurred in Rhythm Game: {e}")
 
 def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index, selected_menu_item):
     """Draw the main menu screen with options moved upward"""

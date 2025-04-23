@@ -742,137 +742,136 @@ class FightingGame:
 
     def run(self):
         """Main loop for the Fighting Game instance."""
-        self.running = True
-        # Ensure initial state is set (e.g., start menu) if not done in init
-        if self.game_state is None: # Add a check just in case
-             self.game_state = STATE_START_MENU
+        try:
+            self.running = True
+            while self.running:
+                dt = self.clock.tick(60) / 1000.0  # Delta time
+                action = None  # Action to take based on input handling
 
-        while self.running:
-            dt = self.clock.tick(60) / 1000.0 # Delta time
-            action = None # Action to take based on input handling
+                # --- State Machine Logic ---
+                if self.game_state == STATE_START_MENU:
+                    self.draw_start_menu()
+                    action = self.handle_start_input()
+                    if action == "QUIT":  # Check if handle_start_input signals exit
+                        self.running = False  # Stop this game's loop
 
-            # --- State Machine Logic ---
-            if self.game_state == STATE_START_MENU:
-                self.draw_start_menu()
-                action = self.handle_start_input()
-                if action == "QUIT": # Check if handle_start_input signals exit
-                    self.running = False # Stop this game's loop
+                elif self.game_state == STATE_LEVEL_SELECT:
+                    self.draw_level_select()
+                    action = self.handle_level_select_input()
+                    if action == "QUIT":
+                        self.running = False
 
-            elif self.game_state == STATE_LEVEL_SELECT:
-                self.draw_level_select()
-                action = self.handle_level_select_input()
-                if action == "QUIT":
-                    self.running = False
+                elif self.game_state == STATE_ATTACK_LIST:
+                    self.draw_attack_list()
+                    gpio_states = read_gpio_input() or {}
+                    # Handle input for attack list screen (including scrolling)
+                    for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                        if event.type == pygame.QUIT:
+                            self.running = False; action = "QUIT"; break
+                        if event.type == pygame.KEYDOWN or gpio_states:
+                            if gpio_states["esc"]:
+                                self.game_state = STATE_START_MENU
+                                self.attack_list_scroll_offset = 0  # Reset scroll on exit
+                                break
+                            elif gpio_states["up"]:
+                                self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
+                            elif gpio_states["down"]:
+                                max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
+                                self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
+                    if action == "QUIT": break
 
-            elif self.game_state == STATE_ATTACK_LIST:
-                self.draw_attack_list()
-                gpio_states = read_gpio_input() or {}
-                # Handle input for attack list screen (including scrolling)
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                    if event.type == pygame.QUIT:
-                        self.running = False; action = "QUIT"; break
-                    if event.type == pygame.KEYDOWN or gpio_states:
-                        if gpio_states["esc"]:
-                            self.game_state = STATE_START_MENU
-                            self.attack_list_scroll_offset = 0 # Reset scroll on exit
-                            break
-                        elif gpio_states["up"]:
-                            self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                        elif gpio_states["down"]:
-                            max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
-                            self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
-                if action == "QUIT": break
+                elif self.game_state == STATE_GAME_RUNNING:
+                    # Handle game input
+                    action = self.handle_input()
+                    if action == "QUIT":
+                        self.running = False
+                        break  # Exit loop immediately on QUIT
 
-            elif self.game_state == STATE_GAME_RUNNING:
-                # Handle game input
-                action = self.handle_input()
-                if action == "QUIT":
-                     self.running = False
-                     break # Exit loop immediately on QUIT
+                    # Update Sprites
+                    if self.player: self.player.update()
+                    if self.opponent:
+                        opponent_action_name = self.opponent.update(self.player)
+                        if opponent_action_name:
+                            self.handle_attack(self.opponent, self.player, opponent_action_name)
 
-                # Update Sprites
-                if self.player: self.player.update()
-                if self.opponent:
-                    opponent_action_name = self.opponent.update(self.player)
-                    if opponent_action_name:
-                        self.handle_attack(self.opponent, self.player, opponent_action_name)
+                    # Update Projectiles
+                    self.projectiles.update(self.screen_width)
 
-                # Update Projectiles
-                self.projectiles.update(self.screen_width)
+                    # Check Projectile Collisions
+                    for proj in self.projectiles:
+                        target = None
+                        if proj.owner == self.player and self.opponent:
+                            target = self.opponent
+                        elif proj.owner == self.opponent and self.player:
+                            target = self.player
 
-                # Check Projectile Collisions
-                for proj in self.projectiles:
-                    target = None
-                    if proj.owner == self.player and self.opponent:
-                        target = self.opponent
-                    elif proj.owner == self.opponent and self.player:
-                        target = self.player
+                        if target and pygame.sprite.collide_rect(proj, target):
+                            print(f"{target.name} hit by projectile!")
+                            self.apply_damage(target, proj.damage, proj.velocity_x > 0, proj.owner, "Projectile", 0)  # Apply damage
+                            proj.kill()  # Remove projectile on hit
 
-                    if target and pygame.sprite.collide_rect(proj, target):
-                        print(f"{target.name} hit by projectile!")
-                        self.apply_damage(target, proj.damage, proj.velocity_x > 0, proj.owner, "Projectile", 0) # Apply damage
-                        proj.kill() # Remove projectile on hit
+                    # --- Game Over Check (Modified for Practice) ---
+                    if self.current_level != 0:  # Only check game over in non-practice levels
+                        if self.player and self.opponent and (not self.player.is_alive() or not self.opponent.is_alive()):
+                            if not self.player.is_alive():
+                                self.winner = "Opponent"
+                                self.game_over_message = "YOU LOSE!"
+                                self.game_state = STATE_GAME_OVER_LOSE
+                            else:
+                                self.winner = "Player"
+                                self.game_over_message = "YOU WIN!"
+                                self.game_state = STATE_GAME_OVER_WIN
+                            print(f"Level {self.current_level}: {self.winner} wins!")
 
-                # --- Game Over Check (Modified for Practice) ---
-                if self.current_level != 0: # Only check game over in non-practice levels
-                    if self.player and self.opponent and (not self.player.is_alive() or not self.opponent.is_alive()):
-                        if not self.player.is_alive():
-                            self.winner = "Opponent"
-                            self.game_over_message = "YOU LOSE!"
-                            self.game_state = STATE_GAME_OVER_LOSE
-                        else:
-                            self.winner = "Player"
-                            self.game_over_message = "YOU WIN!"
-                            self.game_state = STATE_GAME_OVER_WIN
-                        print(f"Level {self.current_level}: {self.winner} wins!")
+                    # --- Drawing ---
+                    if self.current_background:
+                        self.screen.blit(self.current_background, (0, 0))
+                    else:
+                        self.screen.fill((0, 0, 0))  # Fallback background
+                    self.all_sprites.draw(self.screen)
+                    # Draw health bars
+                    if self.player: self.draw_health_bar(self.screen, self.player, 10, 10)
+                    if self.opponent: self.draw_health_bar(self.screen, self.opponent, self.screen_width - 210, 10)
 
-                # --- Drawing ---
-                if self.current_background:
-                    self.screen.blit(self.current_background, (0, 0))
-                else:
-                    self.screen.fill((0, 0, 0)) # Fallback background
-                self.all_sprites.draw(self.screen)
-                # Draw health bars
-                if self.player: self.draw_health_bar(self.screen, self.player, 10, 10)
-                if self.opponent: self.draw_health_bar(self.screen, self.opponent, self.screen_width - 210, 10)
+                elif self.game_state == STATE_PAUSED:
+                    # Draw semi-transparent overlay
+                    overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+                    overlay.fill((0, 0, 0, 180))
+                    self.screen.blit(overlay, (0, 0))
+                    # Draw pause menu options
+                    pause_title = self.title_font.render("Paused", True, (255, 255, 0))
+                    pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 150))
+                    self.screen.blit(pause_title, pause_rect)
+                    for i, option in enumerate(self.pause_options):
+                        text_color = (0, 255, 255) if i == self.selected_pause_option else (180, 180, 180)
+                        option_text = self.font.render(option, True, text_color)
+                        option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
+                        self.screen.blit(option_text, option_rect)
+                    # Handle pause input
+                    for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                        if event.type == pygame.QUIT: self.running = False; break
+                        if event.type == pygame.KEYDOWN or gpio_states:
+                            if gpio_states["esc"]: self.game_state = STATE_GAME_RUNNING  # Resume
+                            elif gpio_states["up"]: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                            elif gpio_states["down"]: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                            elif gpio_states["select"]:
+                                if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING  # Resume
+                                elif self.selected_pause_option == 1:  # Quit to Start Menu
+                                    self.reset_game_state()  # Reset to fighting game start menu
 
+                elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
+                    self.draw_game_over_screen()
+                    action = self.handle_game_over_input()
+                    if action == "QUIT":
+                        self.running = False
 
-            elif self.game_state == STATE_PAUSED:
-                # Draw semi-transparent overlay
-                overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 180))
-                self.screen.blit(overlay, (0, 0))
-                # Draw pause menu options
-                pause_title = self.title_font.render("Paused", True, (255, 255, 0))
-                pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 150))
-                self.screen.blit(pause_title, pause_rect)
-                for i, option in enumerate(self.pause_options):
-                    text_color = (0, 255, 255) if i == self.selected_pause_option else (180, 180, 180)
-                    option_text = self.font.render(option, True, text_color)
-                    option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
-                    self.screen.blit(option_text, option_rect)
-                # Handle pause input
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                     if event.type == pygame.QUIT: self.running = False; break
-                     if event.type == pygame.KEYDOWN or gpio_states:
-                          if gpio_states["esc"]: self.game_state = STATE_GAME_RUNNING # Resume
-                          elif gpio_states["up"]: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                          elif gpio_states["down"]: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                          elif gpio_states["select"]:
-                               if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
-                               elif self.selected_pause_option == 1: # Quit to Start Menu
-                                    self.reset_game_state() # Reset to fighting game start menu
+                # Update the display
+                pygame.display.flip()
 
-            elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
-                self.draw_game_over_screen()
-                action = self.handle_game_over_input()
-                if action == "QUIT":
-                    self.running = False
-
-            # Update the display
-            pygame.display.flip()
-
-        print("Exiting Fighting Game run loop.") # Indicate loop exit
+            print("Exiting Fighting Game run loop.")  # Indicate loop exit
+        except Exception as e:
+            print(f"An error occurred in FightingGame: {e}")
+            self.running = False
 
     def reset_game_state(self):
         """Resets the game to the initial start menu state."""
