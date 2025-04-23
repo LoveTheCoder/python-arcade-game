@@ -34,7 +34,7 @@ class GameMenu:
         self.SELECTED_COLOR = (0, 255, 0)
         
         # Menu options
-        self.options = ["Bullet Hell", "Rhythm Game", "Fighting Game"]
+        self.options = ["Bullet Hell", "Fighting Game"]  # Removed Rhythm Game
         self.selected = 0
         
         # Font
@@ -131,9 +131,6 @@ class GameMenu:
 
     def handle_input(self):
         self.update_gpio_states()  # Update GPIO states dynamically
-        if self.gpio_states.get("esc"):
-            self.running = False
-            return "QUIT"
         if self.gpio_states.get("up"):
             self.selected = (self.selected - 1) % len(self.options)
         elif self.gpio_states.get("down"):
