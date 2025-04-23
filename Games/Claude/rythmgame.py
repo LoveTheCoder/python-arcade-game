@@ -585,14 +585,12 @@ def main():
                 if event.type == pygame.QUIT:
                     running = False
                     
-                elif event.type == pygame.KEYDOWN or gpio_states:
+                elif gpio_states:  # Remove keyboard handling
                     if game_state.current_state == STATE_MENU:
-                        if gpio_states["select"]:
+                        if gpio_states.get("select", False):
                             if game_state.selected_menu_item == 3:
-                                # Selected "Return to Main Menu"
-                                return  # Exit main() so control goes back to main.py
+                                return  # Exit main() to return to main menu
                             else:
-                                # Start the song as before
                                 game_state.current_song = SONGS[game_state.selected_song_index]
                                 melody = game_state.current_song.melody_func()
                                 game_state.music, duration, _ = generate_music(melody)
@@ -601,7 +599,7 @@ def main():
                             handle_menu_input(event, game_state)
                     
                     elif game_state.current_state == STATE_PLAY:
-                        if gpio_states["esc"]:
+                        if gpio_states.get("esc", False):
                             game_state.current_state = STATE_PAUSE
                             game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
                             game_state.music.stop()
@@ -609,11 +607,11 @@ def main():
                             handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
                     
                     elif game_state.current_state == STATE_PAUSE:
-                        if gpio_states["up"]:
+                        if gpio_states.get("up", False):
                             game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
-                        elif gpio_states["down"]:
+                        elif gpio_states.get("down", False):
                             game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
-                        elif gpio_states["select"]:
+                        elif gpio_states.get("select", False):
                             if game_state.selected_pause_option == 0:  # Restart
                                 start_song(game_state)
                             elif game_state.selected_pause_option == 1:  # Exit to Menu
@@ -655,11 +653,10 @@ def main():
                     game_state.song_finished = True
             
             elif game_state.current_state == STATE_RESULTS:
-                if event.type == pygame.KEYDOWN or gpio_states:
-                    if gpio_states["select"]:
-                        # Always return to menu
-                        game_state.current_state = STATE_MENU
-                        game_state.song_finished = False
+                if gpio_states.get("select", False):
+                    # Always return to menu
+                    game_state.current_state = STATE_MENU
+                    game_state.song_finished = False
 
             # Render current state
             screen.fill((0, 0, 0))

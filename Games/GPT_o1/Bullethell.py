@@ -1033,7 +1033,7 @@ def start_menu(screen, font, clock):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif event.type == pygame.KEYDOWN or gpio_states:
+            elif gpio_states:
                 if gpio_states.get("up", False):
                     selected = (selected - 1) % len(options)
                 elif gpio_states.get("down", False):
@@ -1096,9 +1096,8 @@ class BulletHellGame:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.KEYDOWN or gpio_states:
-                if gpio_states["esc"]:
-                    self.running = False
+            elif gpio_states.get("esc", False):  # Remove keyboard handling
+                self.running = False
 
     def run(self):
         try:
@@ -1127,13 +1126,13 @@ class BulletHellGame:
                     self.running = False
                     pygame.quit()
                     return
-                elif event.type == pygame.KEYDOWN or gpio_states:
+                elif gpio_states:
                     if game_over:
-                        if gpio_states["action1"]:
+                        if gpio_states.get("action1", False):
                             self.running = False  # Exit to start menu
-                        elif gpio_states["action2"]:
+                        elif gpio_states.get("action2", False):
                             reset_game(False)
-                        elif gpio_states["action3"]:
+                        elif gpio_states.get("action3", False):
                             reset_game(True)
             if not game_over:
                 # Enemy spawning logic
