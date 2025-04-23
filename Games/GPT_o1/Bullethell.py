@@ -1028,8 +1028,15 @@ def start_menu(screen, font, clock):
     options = ["Start Game", "Return to Main Menu"]
     selected = 0
     title_font = pygame.font.SysFont("Arial", 72, bold=True)
+    last_gpio_states = {}  # To track previous GPIO states for debouncing
     while True:
-        gpio_states = read_gpio_input()
+        current_states = read_gpio_input()
+        gpio_states = {
+            key: current_states[key] and not last_gpio_states.get(key, False)
+            for key in current_states
+        }  # Only register a press if it wasn't pressed in the last state
+        last_gpio_states = current_states
+
         if gpio_states.get("up"):
             selected = (selected - 1) % len(options)
         elif gpio_states.get("down"):
@@ -1072,6 +1079,7 @@ class BulletHellGame:
         
         # Initialize game objects and variables
         self.init_game()
+        self.last_gpio_states = {}  # To track previous GPIO states for debouncing
 
     def init_game(self):
         global player, all_sprites, bullets, enemy_bullets, enemies, bosses, power_points, points
@@ -1081,16 +1089,37 @@ class BulletHellGame:
         # Initialize all game variables and create sprites here
         # (Copy existing initialization code)
 
+    def update_gpio_states(self):
+        """Continuously updates GPIO states for use in the game."""
+        current_states = read_gpio_input()
+        self.gpio_states = {
+            key: current_states[key] and not self.last_gpio_states.get(key, False)
+            for key in current_states
+        }  # Only register a press if it wasn't pressed in the last state
+        self.last_gpio_states = current_states
+
+    def handle_menu_input(self):
+        self.update_gpio_states()  # Update GPIO states dynamically
+        if self.gpio_states.get("esc"):
+            return "QUIT"
+        if self.gpio_states.get("up"):
+            self.selected_option = (self.selected_option - 1) % len(self.menu_options)
+        elif self.gpio_states.get("down"):
+            self.selected_option = (self.selected_option + 1) % len(self.menu_options)
+        elif self.gpio_states.get("select"):
+            return self.menu_options[self.selected_option]
+        return None
+
     def handle_events(self):
-        gpio_states = read_gpio_input()
-        if gpio_states.get("esc"):
+        self.update_gpio_states()
+        if self.gpio_states.get("esc"):
             self.running = False
         elif game_over:
-            if gpio_states.get("action1"):
+            if self.gpio_states.get("action1"):
                 reset_game(False)
-            elif gpio_states.get("action2"):
+            elif self.gpio_states.get("action2"):
                 reset_game(True)
-        elif gpio_states.get("action1"):
+        elif self.gpio_states.get("action1"):
             player.shoot()
 
     def run(self):

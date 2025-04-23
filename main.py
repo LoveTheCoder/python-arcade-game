@@ -46,6 +46,17 @@ class GameMenu:
         self.in_menu = True
         self.clock = clock
 
+        self.last_gpio_states = {}  # To track previous GPIO states for debouncing
+
+    def update_gpio_states(self):
+        """Continuously updates GPIO states for use in the game."""
+        current_states = read_gpio_input()
+        self.gpio_states = {
+            key: current_states[key] and not self.last_gpio_states.get(key, False)
+            for key in current_states
+        }  # Only register a press if it wasn't pressed in the last state
+        self.last_gpio_states = current_states
+
     def draw_background(self):
         # Retro styled background: vertical gradient only.
         for y in range(self.SCREEN_HEIGHT):
@@ -119,15 +130,15 @@ class GameMenu:
         pygame.display.flip()
 
     def handle_input(self):
-        gpio_states = read_gpio_input()
-        if gpio_states.get("esc"):
+        self.update_gpio_states()  # Update GPIO states dynamically
+        if self.gpio_states.get("esc"):
             self.running = False
             return "QUIT"
-        if gpio_states.get("up"):
+        if self.gpio_states.get("up"):
             self.selected = (self.selected - 1) % len(self.options)
-        elif gpio_states.get("down"):
+        elif self.gpio_states.get("down"):
             self.selected = (self.selected + 1) % len(self.options)
-        elif gpio_states.get("select"):
+        elif self.gpio_states.get("select"):
             return self.options[self.selected]
         return None
 
