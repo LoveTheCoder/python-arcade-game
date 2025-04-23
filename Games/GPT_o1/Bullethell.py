@@ -1026,48 +1026,49 @@ def start_menu(screen, font, clock):
     gpio_states = read_gpio_input() or {}
     options = ["Start Game", "Return to Main Menu"]
     selected = 0
-    # Use a larger neon font for the title
     title_font = pygame.font.SysFont("Arial", 72, bold=True)
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or gpio_states:
-                if gpio_states["up"]:
+                if gpio_states.get("up", False):
                     selected = (selected - 1) % len(options)
-                elif gpio_states["down"]:
+                elif gpio_states.get("down", False):
                     selected = (selected + 1) % len(options)
-                elif gpio_states["select"]:
+                elif gpio_states.get("select", False):
                     return options[selected]
-        # Draw static menu background
+
+        # Draw menu background
         draw_menu_background(screen)
-        
-        # Add a semi-transparent overlay for a cyberpunk effect
+
+        # Add overlay for cyberpunk effect
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(100)
         overlay.fill((10, 10, 40))
-        screen.blit(overlay, (0,0))
-        
-        # Draw neon title
+        screen.blit(overlay, (0, 0))
+
+        # Draw title
         title_text = title_font.render("BULLET HELL", True, (0, 255, 255))
         glow = title_font.render("BULLET HELL", True, (255, 20, 147))
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
         screen.blit(glow, (title_rect.x - 2, title_rect.y - 2))
         screen.blit(title_text, title_rect)
-        
-        # Draw menu options
+
+        # Draw options
         for i, option in enumerate(options):
             color = (0, 255, 255) if i == selected else (200, 200, 200)
             option_text = font.render(option, True, color)
             option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + i * 40))
             screen.blit(option_text, option_rect)
-            
-        # Draw instruction line with neon accent
+
+        # Draw instructions
         instr_text = font.render("Use UP/DOWN & ENTER", True, (255, 105, 180))
         instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
         screen.blit(instr_text, instr_rect)
-        
+
         pygame.display.flip()
         clock.tick(FPS)
 
