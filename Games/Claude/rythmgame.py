@@ -523,25 +523,24 @@ def render(screen, game_state, notes, score_tracker, menu_font):
             screen.blit(acc_text, (WIDTH - acc_text.get_width() - 10, 10))
 
 def handle_menu_input(event, game_state):
-    """Handle menu navigation input"""
     gpio_states = read_gpio_input() or {}
-    if gpio_states["up"]:
+
+    if gpio_states.get("up", False):
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
-        # No change for menu item 2 (speed) or 3 (exit)
-    elif gpio_states["down"]:
+    elif gpio_states.get("down", False):
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty + 1) % len(game_state.difficulties)
-    elif gpio_states["left"] and game_state.selected_menu_item == 2:
+    elif gpio_states.get("left", False) and game_state.selected_menu_item == 2:
         game_state.scroll_speed = max(MIN_SCROLL_SPEED, game_state.scroll_speed - 1)
-    elif gpio_states["right"] and game_state.selected_menu_item == 2:
+    elif gpio_states.get("right", False) and game_state.selected_menu_item == 2:
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
-    elif gpio_states["esc"]:
-        game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4  # Now 4 items (0,1,2,3)
+    elif gpio_states.get("esc", False):
+        game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4
 
 def calculate_music_delay(scroll_speed):
     """Calculate delay based on scroll speed - slower speed needs more delay"""

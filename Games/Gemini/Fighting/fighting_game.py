@@ -534,29 +534,19 @@ class FightingGame:
         return None  # No action taken this frame
 
     def handle_level_select_input(self):
-        """Handles input for level selection, including Practice."""
         gpio_states = read_gpio_input() or {}
         total_options = self.max_levels + 1
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN or gpio_states:
-                if gpio_states["esc"]:
-                    self.game_state = STATE_START_MENU
-                    return None
-                elif gpio_states["select"]:
-                    self.initialize_game_session(self.selected_level)
-                    return None # Stay in game loop, state changed
-                elif gpio_states["up"]:
-                    self.selected_level = (self.selected_level - 1) % total_options
-                elif gpio_states["down"]:
-                    self.selected_level = (self.selected_level + 1) % total_options
-                elif gpio_states["left"]:
-                    self.selected_level = max(0, self.selected_level - 1)
-                elif gpio_states["right"]:
-                    self.selected_level = min(total_options - 1, self.selected_level + 1)
-        return None
+
+        if gpio_states.get("esc", False):
+            self.game_state = STATE_START_MENU
+            return None
+        elif gpio_states.get("select", False):
+            self.initialize_game_session(self.selected_level)
+            return None
+        elif gpio_states.get("up", False):
+            self.selected_level = (self.selected_level - 1) % total_options
+        elif gpio_states.get("down", False):
+            self.selected_level = (self.selected_level + 1) % total_options
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
@@ -573,66 +563,30 @@ class FightingGame:
         return None
 
     def handle_input(self):
-        """Handles player input during the game running state."""
-        performed_attack_type = None
         gpio_states = read_gpio_input() or {}
 
-        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
+        if gpio_states.get("esc", False):
+            self.game_state = STATE_PAUSED
+            self.selected_pause_option = 0
+            return None
 
-            if event.type == pygame.KEYDOWN or gpio_states:
-                if gpio_states["esc"]:
-                    self.game_state = STATE_PAUSED
-                    self.selected_pause_option = 0
-                    return None
-
-                # Actions triggered on key press
-                if self.player:
-                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if gpio_states["up"]:
-                        self.player._add_direction_to_buffer('up')
-                        self.player.jump() # Still trigger jump action
-                    elif gpio_states["doen"]:
-                        self.player._add_direction_to_buffer('down')
-                        self.player.crouch() # Still trigger crouch action
-                    elif gpio_states["left"]:
-                         self.player._add_direction_to_buffer('left')
-                         # Movement itself is handled by get_pressed below
-                    elif gpio_states["right"]:
-                         self.player._add_direction_to_buffer('right')
-                         # Movement itself is handled by get_pressed below
-                    # --- End Buffer Input ---
-
-                    # Attack / Dodge Inputs
-                    elif gpio_states["action1"]: # Punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif gpio_states["action2"]: # Kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif gpio_states["action3"]: # Special Move (e.g., Fireball)
-                        self.player.dodge() # Dodge action
-
-            if event.type == pygame.KEYUP or gpio_states:
-                # Stop crouching when DOWN key is released
-                if self.player and gpio_states["down"]:
-                    self.player.stand()
-
-        # --- Continuous Movement (outside event loop, uses get_pressed) ---
-        # This block now ONLY handles the actual movement, not buffer input
-        if self.player and self.game_state == STATE_GAME_RUNNING:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
-                self.player.move_left() # Call movement method
-            if keys[pygame.K_RIGHT]:
-                self.player.move_right() # Call movement method
-
-        # --- Process Attack (if any was performed) ---
-        if performed_attack_type and self.opponent:
-            self.handle_attack(self.player, self.opponent, performed_attack_type)
-
-        return None
+        if self.player:
+            if gpio_states.get("up", False):
+                self.player._add_direction_to_buffer('up')
+                self.player.jump()
+            elif gpio_states.get("down", False):
+                self.player._add_direction_to_buffer('down')
+                self.player.crouch()
+            elif gpio_states.get("left", False):
+                self.player._add_direction_to_buffer('left')
+            elif gpio_states.get("right", False):
+                self.player._add_direction_to_buffer('right')
+            elif gpio_states.get("action1", False):
+                self.player.attack("punch")
+            elif gpio_states.get("action2", False):
+                self.player.attack("kick")
+            elif gpio_states.get("action3", False):
+                self.player.dodge()
 
     def handle_attack(self, attacker, defender, attack_name):
         """Processes the specific attack/combo performed."""

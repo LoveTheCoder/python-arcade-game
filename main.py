@@ -119,13 +119,13 @@ class GameMenu:
     def handle_input(self):
         gpio_states = read_gpio_input() or {}
 
-        if gpio_states["up"]:
+        if gpio_states.get("up", False):
             self.selected = (self.selected - 1) % len(self.options)
-        elif gpio_states["down"]:
+        elif gpio_states.get("down", False):
             self.selected = (self.selected + 1) % len(self.options)
-        elif gpio_states["select"]:
+        elif gpio_states.get("select", False):
             return self.options[self.selected]
-        elif gpio_states["esc"]:
+        elif gpio_states.get("esc", False):
             self.running = False
             return "QUIT"
         return None
