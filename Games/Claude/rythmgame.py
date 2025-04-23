@@ -20,9 +20,9 @@ GPIO_PINS = {
 }
 
 # GPIO Setup
-GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-for pin in GPIO_PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
+#GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+#for pin in GPIO_PINS.values():
+    #GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
 
 def read_gpio_input():
     """Reads GPIO input states and returns a dictionary of button states."""
@@ -78,10 +78,10 @@ GRAY = (128, 128, 128)
 
 # Key mapping
 KEY_MAP = {
-    pygame.K_d: 0,
-    pygame.K_f: 1,
-    pygame.K_j: 2,
-    pygame.K_k: 3
+    "action1": 0,
+    "select": 1,
+    "action2": 2,
+    "action3": 3
 }
 
 def generate_square_wave(frequency, duration, amplitude=0.3, duty_cycle=0.5):
@@ -626,7 +626,7 @@ def main():
                         game_state.current_state = STATE_PAUSE
                         game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
                         game_state.music.stop()
-                    elif event.key in KEY_MAP:
+                    elif gpio_states in KEY_MAP:
                         handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
                 
                 elif game_state.current_state == STATE_PAUSE:

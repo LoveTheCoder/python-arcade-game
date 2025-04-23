@@ -20,9 +20,9 @@ GPIO_PINS = {
 }
 
 # GPIO Setup
-GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-for pin in GPIO_PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
+#GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+#for pin in GPIO_PINS.values():
+#    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
 #test
 
 def read_gpio_input():
