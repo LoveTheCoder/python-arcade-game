@@ -953,28 +953,28 @@ def reset_game(continue_game=False):
         bosses.empty()
         power_points.empty()
         points.empty()
-        
+
         # Reset player
         player.lives = 3
         player.power_level = 1
         player.continued_run = False
         player.score = 0
-        
+
         # Create new player image with original colors
         player.image = pygame.Surface((30, 30), pygame.SRCALPHA)
         pygame.draw.circle(player.image, BLUE, (15, 15), 15)  # Blue circle
         pygame.draw.circle(player.image, RED, (15, 15), 3)    # Red hitbox
-        
+
         player.rect.centerx = SCREEN_WIDTH / 2
         player.rect.bottom = SCREEN_HEIGHT - 50
         all_sprites.add(player)
     else:
         # Continue from current state
-        player.lives = 3
+        player.lives = max(player.lives, 1)  # Ensure at least 1 life remains
         player.continued_run = True
-    
-    # Always reset score
-    player.score = 0
+
+    # Always reset score and game state flags
+    player.score = max(player.score, 0)
     game_over = False
     level_complete = False
     game_won = False
