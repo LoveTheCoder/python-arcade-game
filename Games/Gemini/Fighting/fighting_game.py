@@ -613,6 +613,49 @@ class FightingGame:
                     self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
         return None
 
+    def handle_level_select_input(self):
+        """Handles input for level selection, including Practice."""
+        self.update_gpio_states()  # Ensure GPIO states are updated at the start of the method
+        total_options = self.max_levels + 1
+
+        # Handle GPIO-based navigation
+        if self.gpio_states.get("up"):
+            self.selected_level = (self.selected_level - 1) % total_options
+        elif self.gpio_states.get("down"):
+            self.selected_level = (self.selected_level + 1) % total_options
+        elif self.gpio_states.get("left"):
+            self.selected_level = max(0, self.selected_level - 1)
+        elif self.gpio_states.get("right"):
+            self.selected_level = min(total_options - 1, self.selected_level + 1)
+        elif self.gpio_states.get("select"):
+            self.initialize_game_session(self.selected_level)  # Ensure game session starts
+            return None  # Stay in game loop, state changed
+        elif self.gpio_states.get("esc"):
+            self.game_state = STATE_START_MENU
+            return None
+
+        # Handle keyboard events for fallback
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+                return "QUIT"
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game_state = STATE_START_MENU
+                    return None
+                elif event.key == pygame.K_RETURN:
+                    self.initialize_game_session(self.selected_level)  # Ensure game session starts
+                    return None  # Stay in game loop, state changed
+                elif event.key == pygame.K_UP:
+                    self.selected_level = (self.selected_level - 1) % total_options
+                elif event.key == pygame.K_DOWN:
+                    self.selected_level = (self.selected_level + 1) % total_options
+                elif event.key == pygame.K_LEFT:
+                    self.selected_level = max(0, self.selected_level - 1)
+                elif event.key == pygame.K_RIGHT:
+                    self.selected_level = min(total_options - 1, self.selected_level + 1)
+        return None
+
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
         for event in pygame.event.get():
