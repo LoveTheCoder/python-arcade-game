@@ -27,7 +27,7 @@ GPIO_PINS = {
 
 def read_gpio_input():
     """Reads GPIO input states and returns a dictionary of button states."""
-    return {key: not GPIO.input(pin) for key, pin in GPIO_PINS.items()}  # `not` inverts because pull-up is used
+    return {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
 
 # Get the directory of the current Python file
 current_dir = os.path.dirname(os.path.realpath(__file__))
