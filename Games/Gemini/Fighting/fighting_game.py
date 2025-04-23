@@ -518,9 +518,9 @@ class FightingGame:
 
                 if self.player:
                     if self.gpio_states.get("action1") or keys[pygame.K_q]:
-                        self.player.attack("punch")
+                        performed_attack_type = self.player.attack("punch")
                     elif self.gpio_states.get("action2") or keys[pygame.K_e]:
-                        self.player.attack("kick")
+                        performed_attack_type = self.player.attack("kick")
                     elif self.gpio_states.get("action3") or keys[pygame.K_SPACE]:
                         self.player.dodge()
 
@@ -532,8 +532,11 @@ class FightingGame:
                 self.player.move_right()
             if self.gpio_states.get("up") or keys[pygame.K_UP]:
                 self.player.jump()
-            if self.gpio_states.get("down") or keys[pygame.K_DOWN]:
-                self.player.crouch()
+            #if self.gpio_states.get("down") or keys[pygame.K_DOWN]:
+            #    self.player.crouch()
+
+        if performed_attack_type and self.opponent:
+            self.handle_attack(self.player, self.opponent, performed_attack_type)
 
         return None
 

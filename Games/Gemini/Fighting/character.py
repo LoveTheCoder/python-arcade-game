@@ -24,6 +24,7 @@ class Character(pygame.sprite.Sprite):
         self.attack_power = 10
         self.speed = 5
         self.is_jumping = False
+        self.is_crouching = False
         self.y_velocity = 0
         self.gravity = 0.5
         self.facing_right = (self.rect.centerx < screen_width / 2)
@@ -56,7 +57,11 @@ class Character(pygame.sprite.Sprite):
             # Basic Attacks
             "punch": {"damage": 10, "range": self.rect.width * 1.2, "anim_frames": 3, "duration": 300},
             "kick": {"damage": 15, "range": self.rect.width * 1.4, "anim_frames": 4, "duration": 400},
-            "dodge": {"damage": 0, "duration": 300}  # Dodge is not an attack but added for consistency
+
+            # Combo Attacks
+            "Fireball": {"damage": 30, "duration": 400, "type": "projectile"},
+            "Throw": {"damage": 20, "range": self.rect.width * 0.8, "duration": 500, "type": "melee"},
+            "SpinKick": {"damage": 35, "range": self.rect.width * 1.6, "anim_frames": 4, "duration": 500, "type": "melee"}
         }
         self.combo_moves = {
             (('down', 'right'), 'punch'): {"name": "Fireball"},
@@ -82,7 +87,7 @@ class Character(pygame.sprite.Sprite):
         """Generates all stick figure sprite surfaces, including animations."""
         sprites = {}
         base_width, base_height = 40, 70
-        jump_height = 65
+        crouch_height, jump_height = 50, 65
         line_thickness = 4
 
         # Colors (same as before)
@@ -110,6 +115,15 @@ class Character(pygame.sprite.Sprite):
             pygame.draw.line(surface, stick_color, (torso_x, shoulder_y), (torso_x + 15, shoulder_y - 5), line_thickness)
             pygame.draw.line(surface, stick_color, (torso_x, jump_height - 15), (torso_x - 5, jump_height - 2), line_thickness)
             pygame.draw.line(surface, stick_color, (torso_x, jump_height - 15), (torso_x + 5, jump_height - 2), line_thickness)
+
+        def draw_crouch(surface):
+            crouch_head_y = head_radius + 10; crouch_torso_bottom = crouch_height - 10
+            pygame.draw.circle(surface, head_color, (head_center_x, crouch_head_y), head_radius)
+            pygame.draw.line(surface, stick_color, (torso_x, crouch_head_y + head_radius), (torso_x, crouch_torso_bottom), line_thickness)
+            pygame.draw.line(surface, stick_color, (torso_x, crouch_head_y + head_radius + 5), (torso_x - 15, crouch_head_y + head_radius + 10), line_thickness)
+            pygame.draw.line(surface, stick_color, (torso_x, crouch_head_y + head_radius + 5), (torso_x + 15, crouch_head_y + head_radius + 10), line_thickness)
+            pygame.draw.line(surface, stick_color, (torso_x, crouch_torso_bottom), (torso_x - 10, crouch_height - 2), line_thickness)
+            pygame.draw.line(surface, stick_color, (torso_x, crouch_torso_bottom), (torso_x + 10, crouch_height - 2), line_thickness)
 
         def draw_punch_anim(surface, frame):
             draw_idle(surface)
@@ -148,14 +162,15 @@ class Character(pygame.sprite.Sprite):
              pygame.draw.line(surface, attack_color, (torso_x, hip_y), (leg_end_x, leg_end_y), line_thickness + 2)
 
         for state, draw_func, w, h in [('idle', draw_idle, base_width, base_height),
-                                       ('jump', draw_jump, base_width, jump_height)]:
+                                       ('jump', draw_jump, base_width, jump_height),
+                                       ('crouch', draw_crouch, base_width, crouch_height)]:
             surf = pygame.Surface([w, h], pygame.SRCALPHA)
             draw_func(surf)
             sprites[f'{state}_right'] = surf
             sprites[f'{state}_left'] = pygame.transform.flip(surf, True, False)
 
-        sprites['dodge_right'] = sprites['idle_right'].copy()
-        sprites['dodge_left'] = sprites['idle_left'].copy()
+        sprites['dodge_right'] = sprites['crouch_right'].copy()
+        sprites['dodge_left'] = sprites['crouch_left'].copy()
 
         for attack_name, draw_func, frames, w, h in [('punch', draw_punch_anim, 3, base_width + 15, base_height),
                                                      ('kick', draw_kick_anim, 4, base_width + 15, base_height + 5),
@@ -189,6 +204,7 @@ class Character(pygame.sprite.Sprite):
             state = 'idle'  # Optionally, you can add a specific "stunned" sprite
         elif self.is_jumping: state = 'jump'
         elif self.is_dodging: state = 'dodge'
+        elif self.is_crouching: state = 'crouch'
         elif self.is_attacking:
             attack_name = self.current_attack_type
             attack_info = self.attacks.get(attack_name, {})
@@ -283,23 +299,31 @@ class Character(pygame.sprite.Sprite):
 
     def move_left(self):
         # Handles actual movement, NO buffer call here
-        if not self.is_stunned and not self.is_dodging and not self.is_attacking:
+        if not self.is_stunned and not self.is_dodging and not self.is_attacking and not self.is_crouching:
             self.rect.x -= self.speed
             if self.rect.left < 0: self.rect.left = 0
             self.facing_right = False
 
     def move_right(self):
         # Handles actual movement, NO buffer call here
-        if not self.is_stunned and not self.is_dodging and not self.is_attacking:
+        if not self.is_stunned and not self.is_dodging and not self.is_attacking and not self.is_crouching:
             self.rect.x += self.speed
             if self.rect.right > self.screen_width: self.rect.right = self.screen_width
             self.facing_right = True
 
     def jump(self):
         # Handles jump state, NO buffer call here
-        if not self.is_stunned and not self.is_jumping and not self.is_dodging and not self.is_attacking:
+        if not self.is_stunned and not self.is_jumping and not self.is_dodging and not self.is_attacking and not self.is_crouching:
             self.is_jumping = True
             self.y_velocity = -12
+
+    def crouch(self):
+        # Handles crouch state, NO buffer call here
+        if not self.is_stunned and not self.is_jumping and not self.is_dodging and not self.is_attacking:
+            self.is_crouching = True
+
+    def stand(self):
+        self.is_crouching = False
 
     def dodge(self):
         now = pygame.time.get_ticks()
@@ -312,7 +336,7 @@ class Character(pygame.sprite.Sprite):
         if not self.is_stunned and \
            now - self.last_attack_time > self.attack_cooldown and \
            not self.is_attacking and not self.is_dodging and \
-           not self.is_jumping:
+           not self.is_crouching and not self.is_jumping:
 
             performed_attack_type = attack_type
             is_combo = False
@@ -354,15 +378,10 @@ class Character(pygame.sprite.Sprite):
 
     def take_damage(self, damage):
         if not self.is_dodging:
-            self.health -= damage
+            effective_damage = damage * 0.25 if self.is_crouching else damage
+            self.health -= effective_damage
             if self.health < 0: self.health = 0
             print(f"{self.name} health: {self.health}")
 
     def is_alive(self):
         return self.health > 0
-
-    def crouch(self):
-        pass  # Removed crouch functionality
-
-    def stand(self):
-        pass  # Removed crouch functionality
