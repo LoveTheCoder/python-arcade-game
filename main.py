@@ -88,51 +88,50 @@ class GameMenu:
 
     def draw_menu(self):
         self.draw_background()
-
-        # Draw title with neon effect
+        
+        # Draw title with neon effect.
         title_text = self.font.render("Game Selection", True, (0, 255, 255))
         glow = self.font.render("Game Selection", True, (255, 20, 147))
-        title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH / 2, 80))
-        self.screen.blit(glow, (title_rect.x + 2, title_rect.y + 2))
+        title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH/2, 80))
+        self.screen.blit(glow, (title_rect.x+2, title_rect.y+2))
         self.screen.blit(title_text, title_rect)
-
-        # Draw options with their graphic
+        
+        # Draw options with their graphic.
         for i, option in enumerate(self.options):
             rect = pygame.Rect(0, 0, 300, 80)
-            rect.center = (self.SCREEN_WIDTH // 2, 200 + i * 100)
+            rect.center = (self.SCREEN_WIDTH//2, 200 + i * 100)
             fill_color = (50, 50, 50) if i != self.selected else (80, 80, 80)
             pygame.draw.rect(self.screen, fill_color, rect, border_radius=10)
-
             border_color = self.SELECTED_COLOR if i == self.selected else self.WHITE
             pygame.draw.rect(self.screen, border_color, rect, 3, border_radius=10)
-
+            self.draw_option_graphic(option, rect)
             text = self.small_font.render(option, True, border_color)
             text_rect = text.get_rect(center=(rect.centerx, rect.centery))
             self.screen.blit(text, text_rect)
 
-        # Draw instructions for game selection
+        # Draw instructions for game selection.
         instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
-        instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT - 30))
+        instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
-
+                
         pygame.display.flip()
 
     def handle_input(self):
         gpio_states = read_gpio_input() or {}
 
-        if gpio_states.get("up", False):
+        if gpio_states["up"]:
             self.selected = (self.selected - 1) % len(self.options)
-        elif gpio_states.get("down", False):
+        elif gpio_states["down"]:
             self.selected = (self.selected + 1) % len(self.options)
-        elif gpio_states.get("select", False):
+        elif gpio_states["select"]:
             return self.options[self.selected]
-        elif gpio_states.get("esc", False):
+        elif gpio_states["esc"]:
             self.running = False
             return "QUIT"
         return None
 
     def run(self):
-        bullet_hell_game = BulletHellGame()
+        bullet_hell_game = BulletHellGame()  # if these work correctly
         while self.running:
             if self.in_menu:
                 self.draw_menu()
@@ -147,6 +146,7 @@ class GameMenu:
                     self.in_menu = True
                 elif action == "Fighting Game":
                     self.in_menu = False
+                    # Create a new instance so that internal state is fresh
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
