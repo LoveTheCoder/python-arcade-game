@@ -120,19 +120,30 @@ class GameMenu:
     def handle_input(self):
         gpio_states = read_gpio_input() or {}
 
-        if gpio_states.get("up", True):
+        # Debugging: Print the gpio_states to verify input
+        print(f"GPIO States: {gpio_states}")
+
+        # Debounce logic: Ensure the ESC key is not falsely triggered
+        if gpio_states.get("esc", False):
+            print("ESC detected. Verifying debounce...")
+            pygame.time.wait(50)  # Wait 50ms to debounce
+            gpio_states = read_gpio_input() or {}
+            if gpio_states.get("esc", False):
+                print("ESC confirmed after debounce. Exiting menu.")
+                self.running = False
+                return "QUIT"
+            else:
+                print("False ESC detection ignored.")
+
+        if gpio_states.get("up", False):
             self.selected = (self.selected - 1) % len(self.options)
             print(f"Menu selection moved up: {self.selected}")
-        elif gpio_states.get("down", True):
+        elif gpio_states.get("down", False):
             self.selected = (self.selected + 1) % len(self.options)
             print(f"Menu selection moved down: {self.selected}")
-        elif gpio_states.get("select", True):
+        elif gpio_states.get("select", False):
             print(f"Menu option selected: {self.options[self.selected]}")
             return self.options[self.selected]
-        elif gpio_states.get("esc", True):
-            print("Escape pressed. Exiting menu.")
-            self.running = False
-            return "QUIT"
         return None
 
     def run(self):
