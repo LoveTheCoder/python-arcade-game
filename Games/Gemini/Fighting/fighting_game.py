@@ -319,10 +319,16 @@ class FightingGame:
 
         self.current_background = None
         self.gpio_states = {}  # Initialize GPIO states
+        self.last_gpio_states = {}  # To track previous GPIO states for debouncing
 
     def update_gpio_states(self):
         """Continuously updates GPIO states for use in the game."""
-        self.gpio_states = read_gpio_input()
+        current_states = read_gpio_input()
+        self.gpio_states = {
+            key: current_states[key] and not self.last_gpio_states.get(key, False)
+            for key in current_states
+        }  # Only register a press if it wasn't pressed in the last state
+        self.last_gpio_states = current_states
 
     def initialize_game_session(self, level):
         """Sets up player, opponent, and background for the selected level."""
@@ -540,18 +546,18 @@ class FightingGame:
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
+        self.update_gpio_states()  # Update GPIO states dynamically
         total_options = self.max_levels + 1
         for event in pygame.event.get():
-            self.update_gpio_states()  # Update GPIO states dynamically
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
                 if self.gpio_states.get("esc"):
                     self.game_state = STATE_START_MENU
                     return None
                 elif self.gpio_states.get("select"):
-                    self.initialize_game_session(self.selected_level)
+                    self.initialize_game_session(self.selected_level)  # Ensure game session starts
                     return None  # Stay in game loop, state changed
                 elif self.gpio_states.get("up"):
                     self.selected_level = (self.selected_level - 1) % total_options
