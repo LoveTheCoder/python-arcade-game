@@ -6,6 +6,7 @@ import math
 from .character import Character
 from .ai_opponent import AIOpponent
 from gpio_manager import read_gpio_input
+from time import sleep
 
 # Add Game States
 STATE_START_MENU = 0
@@ -884,7 +885,9 @@ class FightingGame:
                 self.update_gpio_states()  # Update GPIO states dynamically
                 #if event.type == pygame.QUIT: self.running = False; break
                 #if event.type == pygame.KEYDOWN:
-                if self.gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING # Resume
+                if self.gpio_states.get("esc"):
+                    sleep(0.2) 
+                    self.game_state = STATE_GAME_RUNNING # Resume
                 elif self.gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
                 elif self.gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
                 elif self.gpio_states.get("select"):

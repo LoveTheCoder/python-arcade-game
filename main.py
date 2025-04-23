@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 from gpio_manager import read_gpio_input
+from time import sleep
 
 # Removed update_game_from_github and configure_wifi functions
 
@@ -146,6 +147,7 @@ class GameMenu:
                 self.draw_menu()
                 action = self.handle_input()
                 if action == "Bullet Hell":
+                    sleep(0.5)
                     self.in_menu = False
                     bullet_hell_game.run()
                     self.in_menu = True
@@ -154,6 +156,7 @@ class GameMenu:
                     rhythm_game_main()
                     self.in_menu = True
                 elif action == "Fighting Game":
+                    sleep(0.5)
                     self.in_menu = False
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
