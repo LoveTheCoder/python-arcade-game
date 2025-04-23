@@ -880,17 +880,17 @@ class FightingGame:
                     option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
                     self.screen.blit(option_text, option_rect)
                 # Handle pause input
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                    self.update_gpio_states()  # Update GPIO states dynamically
-                    if event.type == pygame.QUIT: self.running = False; break
-                    #if event.type == pygame.KEYDOWN:
-                    if self.gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING # Resume
-                    elif self.gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                    elif self.gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                    elif self.gpio_states.get("select"):
-                        if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
-                        elif self.selected_pause_option == 1: # Quit to Start Menu
-                            self.reset_game_state() # Reset to fighting game start menu
+                #for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                self.update_gpio_states()  # Update GPIO states dynamically
+                #if event.type == pygame.QUIT: self.running = False; break
+                #if event.type == pygame.KEYDOWN:
+                if self.gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING # Resume
+                elif self.gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                elif self.gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                elif self.gpio_states.get("select"):
+                    if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
+                    elif self.selected_pause_option == 1: # Quit to Start Menu
+                        self.reset_game_state() # Reset to fighting game start menu
 
             elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
                 self.draw_game_over_screen()
