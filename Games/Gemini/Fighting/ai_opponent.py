@@ -89,7 +89,7 @@ class AIOpponent(Character):
             self.state_timer = 0
             return
 
-        if random.random() < self.block_chance and not self.is_crouching and self.current_state != STATE_BLOCKING:
+        if random.random() < self.block_chance and self.current_state != STATE_BLOCKING:
             self.current_state = STATE_BLOCKING
             self.state_duration = random.randint(300, 800)
             self.state_timer = 0
