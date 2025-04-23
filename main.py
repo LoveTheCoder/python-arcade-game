@@ -3,13 +3,10 @@ import sys
 import os
 import random
 import subprocess
+from gpiozero import Button, GPIOZeroError
 import atexit
 
-# Try to import gpiozero; if not available, ignore GPIO input.
-try:
-    from gpiozero import Button
-except ImportError:
-    Button = None
+# Removed update_game_from_github and configure_wifi functions
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -20,22 +17,51 @@ sys.path.append(os.path.join(GAMES_DIR, 'Claude'))
 sys.path.append(os.path.join(GAMES_DIR, 'Gemini', 'Fighting'))  # Corrected path
 
 # Import the games
-from Games.GPT_o1.Bullethell import BulletHellGame, set_gpio_buttons
+from Games.GPT_o1.Bullethell import BulletHellGame
 from Games.Claude.rythmgame import main as rhythm_game_main
 from Games.Gemini.Fighting.fighting_game import FightingGame
 
-def close_gpio_buttons(gpio_buttons):
-    if gpio_buttons:
-        for name, button in gpio_buttons.items():
-            button.close()
-        print("Main: GPIO buttons closed.")
-    return None
+# Initialize GPIO buttons
+def initialize_gpio():
+    try:
+        gpio_buttons = {
+            # Directional buttons
+            "button_up": Button(4),
+            "button_down": Button(2),
+            "button_left": Button(3),
+            "button_right": Button(5),
+            # Menu buttons
+            "button_esc": Button(6),
+            "button_select": Button(7),
+            # Action buttons
+            "button_action1": Button(8),  # Primary action (shoot/hit/select)
+            "button_action2": Button(9),  # Secondary action
+            "button_action3": Button(10)  # Tertiary action
+        }
+        print("GPIO buttons initialized")
+        return gpio_buttons
+    except GPIOZeroError as e:
+        print(f"GPIO Error: {e}. Falling back to keyboard controls.")
+        return None
+    except Exception as e:
+        print(f"Unexpected error initializing GPIO: {e}")
+        return None
 
-# Register exit cleanup even for menu buttons
-atexit.register(lambda: close_gpio_buttons(globals().get('gpio_buttons', None)))
+# Cleanup GPIO
+def cleanup_gpio(gpio_buttons):
+    if gpio_buttons:
+        try:
+            for button_name, button in gpio_buttons.items():
+                button.close()
+            print("GPIO cleaned up")
+        except Exception as e:
+            print(f"Error cleaning up GPIO: {e}")
+
+# Register cleanup at exit
+atexit.register(cleanup_gpio)
 
 class GameMenu:
-    def __init__(self, screen, clock, gpio_buttons=None):
+    def __init__(self, screen, clock):
         self.SCREEN_WIDTH = 800
         self.SCREEN_HEIGHT = 480
         self.screen = screen
@@ -59,14 +85,6 @@ class GameMenu:
         self.running = True
         self.in_menu = True
         self.clock = clock
-
-        # Initialize GPIO buttons using gpiozero if available.
-        self.gpio_buttons = gpio_buttons
-        if self.gpio_buttons:
-            # Last state for each GPIO button to detect rising edge
-            self.last_gpio_state = {name: False for name in self.gpio_buttons}
-        else:
-            self.last_gpio_state = None
 
     def draw_background(self):
         # Retro styled background: vertical gradient only.
@@ -134,14 +152,13 @@ class GameMenu:
             self.screen.blit(text, text_rect)
 
         # Draw instructions for game selection.
-        instructions = self.small_font.render("Press UP/DOWN or GPIO, ENTER or SELECT to start, ESC to go back", True, self.WHITE)
+        instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
         instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
                 
         pygame.display.flip()
 
     def handle_input(self):
-        # Process pygame keyboard events.
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -155,107 +172,38 @@ class GameMenu:
                     return self.options[self.selected]
                 elif event.key == pygame.K_ESCAPE:
                     return "MENU"
-
-        # Process GPIO inputs if available.
-        if self.gpio_buttons:
-            for name, button in self.gpio_buttons.items():
-                current_state = button.is_pressed
-                if current_state and not self.last_gpio_state[name]:
-                    if name == 'up':
-                        self.selected = (self.selected - 1) % len(self.options)
-                    elif name == 'down':
-                        self.selected = (self.selected + 1) % len(self.options)
-                    elif name == 'select':
-                        return self.options[self.selected]
-                    elif name == 'esc':
-                        return "MENU"
-                self.last_gpio_state[name] = current_state
-
         return None
 
     def run(self):
+        bullet_hell_game = BulletHellGame()  # if these work correctly
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
-                if action in ("Bullet Hell", "Rhythm Game", "Fighting Game"):
-                    # Close current menu GPIO before launching game
-                    self.gpio_buttons = close_gpio_buttons(self.gpio_buttons)
-                    if action == "Bullet Hell":
-                        # Reinitialize a new set for the game module (if available)
-                        new_gpio = None
-                        if Button:
-                            try:
-                                new_gpio = {
-                                    'up': Button(4, pull_up=True, bounce_time=0.1),
-                                    'down': Button(2, pull_up=True, bounce_time=0.1),
-                                    'left': Button(3, pull_up=True, bounce_time=0.1),
-                                    'right': Button(5, pull_up=True, bounce_time=0.1),
-                                    'esc': Button(6, pull_up=True, bounce_time=0.1),
-                                    'select': Button(7, pull_up=True, bounce_time=0.1),
-                                    'action1': Button(8, pull_up=True, bounce_time=0.1),
-                                    'action2': Button(9, pull_up=True, bounce_time=0.1),
-                                    'action3': Button(10, pull_up=True, bounce_time=0.1)
-                                }
-                                print("Main: New GPIO buttons reinitialized for the game.")
-                            except Exception as e:
-                                print(f"Error reinitializing GPIO for game: {e}")
-                        # Launch chosen game passing the fresh instance
-                        if action == "Bullet Hell":
-                            bullet_hell_game = BulletHellGame(gpio_buttons=new_gpio)
-                            self.in_menu = False
-                            bullet_hell_game.run()
-                            self.in_menu = True
-                    # (Add similar blocks if launching other games)
-                    # Reinitialize menu GPIO after returning from a game
-                    if Button:
-                        try:
-                            self.gpio_buttons = {
-                                'up': Button(4, pull_up=True, bounce_time=0.1),
-                                'down': Button(2, pull_up=True, bounce_time=0.1),
-                                'left': Button(3, pull_up=True, bounce_time=0.1),
-                                'right': Button(5, pull_up=True, bounce_time=0.1),
-                                'esc': Button(6, pull_up=True, bounce_time=0.1),
-                                'select': Button(7, pull_up=True, bounce_time=0.1),
-                                'action1': Button(8, pull_up=True, bounce_time=0.1),
-                                'action2': Button(9, pull_up=True, bounce_time=0.1),
-                                'action3': Button(10, pull_up=True, bounce_time=0.1)
-                            }
-                            print("Main: Menu GPIO reinitialized after game exit.")
-                        except Exception as e:
-                            print(f"Error reinitializing menu GPIO: {e}")
-                elif action in ("Exit", "QUIT", "MENU"):
+                if action == "Bullet Hell":
+                    self.in_menu = False
+                    bullet_hell_game.run()
+                    self.in_menu = True
+                elif action == "Rhythm Game":
+                    self.in_menu = False
+                    rhythm_game_main()
+                    self.in_menu = True
+                elif action == "Fighting Game":
+                    self.in_menu = False
+                    # Create a new instance so that internal state is fresh
+                    fighting_game = FightingGame(self.screen, self.clock)
+                    fighting_game.run()
+                    self.in_menu = True
+                elif action == "Exit" or action == "QUIT":
                     self.running = False
                 self.clock.tick(60)
         pygame.quit()
 
-def main():
-    # Initialize the GPIO buttons in main.py (if available)
-    gpio_buttons = None
-    if Button:
-        try:
-            gpio_buttons = {
-                'up': Button(4, pull_up=True, bounce_time=0.1),
-                'down': Button(2, pull_up=True, bounce_time=0.1),
-                'left': Button(3, pull_up=True, bounce_time=0.1),
-                'right': Button(5, pull_up=True, bounce_time=0.1),
-                'esc': Button(6, pull_up=True, bounce_time=0.1),
-                'select': Button(7, pull_up=True, bounce_time=0.1),
-                'action1': Button(8, pull_up=True, bounce_time=0.1),
-                'action2': Button(9, pull_up=True, bounce_time=0.1),
-                'action3': Button(10, pull_up=True, bounce_time=0.1)
-            }
-            print("Main: GPIO buttons initialized successfully")
-        except Exception as e:
-            print(f"Main: Error initializing GPIO buttons: {e}")
-    # Pass the initialized gpio_buttons to your game modules
-    set_gpio_buttons(gpio_buttons)
-
+if __name__ == "__main__":
     pygame.init()
     screen = pygame.display.set_mode((800, 480))
     clock = pygame.time.Clock()
-    menu = GameMenu(screen, clock, gpio_buttons)
+    gpio_buttons = initialize_gpio()
+    menu = GameMenu(screen, clock)
     menu.run()
-
-if __name__ == "__main__":
-    main()
+    cleanup_gpio(gpio_buttons)
