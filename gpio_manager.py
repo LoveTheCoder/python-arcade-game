@@ -3,10 +3,10 @@ from time import sleep
 
 # GPIO Pin Definitions
 GPIO_PINS = {
-    "down": Button(2, pull_up=True),
-    "left": Button(3, pull_up=True),
-    "up": Button(4, pull_up=True),
-    "right": Button(5, pull_up=True),
+    "down": Button(5, pull_up=True),
+    "left": Button(2, pull_up=True),
+    "up": Button(3, pull_up=True),
+    "right": Button(4, pull_up=True),
     "esc": Button(6, pull_up=True),
     "select": Button(7, pull_up=True),
     "action1": Button(8, pull_up=True),

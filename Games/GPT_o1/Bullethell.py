@@ -1092,12 +1092,13 @@ class BulletHellGame:
         # (Copy existing initialization code)
 
     def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.running = False
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+        elif gpio_states.get("action1"):
+            reset_game(False)
+        elif gpio_states.get("action2"):
+            reset_game(True)
 
     def run(self):
         while True:
@@ -1116,19 +1117,7 @@ class BulletHellGame:
         while self.running:
             self.clock.tick(FPS)
             now = pygame.time.get_ticks()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                    pygame.quit()
-                    return
-                elif event.type == pygame.KEYDOWN:
-                    if game_over:
-                        if event.key == pygame.K_m:
-                            self.running = False  # Exit to start menu
-                        elif event.key == pygame.K_r:
-                            reset_game(False)
-                        elif event.key == pygame.K_c:
-                            reset_game(True)
+            self.handle_events()
             if not game_over:
                 # Enemy spawning logic
                 waves_per_level = 3 + (level // 2)
@@ -1297,20 +1286,14 @@ def main():
     while running:
         clock.tick(FPS)
         now = pygame.time.get_ticks()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN and game_over:
-                if event.key == pygame.K_m:
-                    running = False  # Break out to return to the start menu
-                elif game_won:
-                    if event.key == pygame.K_r:
-                        reset_game(False)
-                else:
-                    if event.key == pygame.K_r:
-                        reset_game(False)
-                    elif event.key == pygame.K_c:
-                        reset_game(True)
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            running = False
+        elif game_over:
+            if gpio_states.get("action1"):
+                reset_game(False)
+            elif gpio_states.get("action2"):
+                reset_game(True)
         if not game_over:
             all_sprites.update()
 

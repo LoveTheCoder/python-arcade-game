@@ -666,12 +666,11 @@ while running:
     now = pygame.time.get_ticks()
 
     # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN and game_over:
-            if event.key == pygame.K_r:
-                reset_game()
+    gpio_states = read_gpio_input()
+    if gpio_states.get("esc"):
+        running = False
+    elif gpio_states.get("action1") and game_over:
+        reset_game()
 
     if not game_over:
         # Update all sprites

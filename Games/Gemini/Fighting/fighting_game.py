@@ -509,64 +509,34 @@ class FightingGame:
 
     def handle_start_input(self):
         """Handles input for the main start menu of the fighting game."""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"  # Signal exit
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif event.key == pygame.K_DOWN:
-                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-                elif event.key == pygame.K_RETURN:
-                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
-                        self.game_state = STATE_LEVEL_SELECT
-                        self.selected_level = 1  # Reset level selection
-                    elif self.selected_start_option == 1:  # Attack List
-                        self.game_state = STATE_ATTACK_LIST
-                    elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
-                        self.running = False  # Stop this game's loop
-                        return "QUIT"  # Signal exit from this game instance
-                elif event.key == pygame.K_ESCAPE:  # Allow ESC to exit from this game's menu
-                    self.running = False
-                    return "QUIT"
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+            return "QUIT"  # Signal exit
+        elif gpio_states.get("action1"):
+            self.initialize_game_session(self.selected_level)
+        elif gpio_states.get("action2"):
+            self.game_state = STATE_START_MENU
         return None  # No action taken this frame
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
-        total_options = self.max_levels + 1
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.game_state = STATE_START_MENU
-                    return None
-                elif event.key == pygame.K_RETURN:
-                    self.initialize_game_session(self.selected_level)
-                    return None # Stay in game loop, state changed
-                elif event.key == pygame.K_UP:
-                    self.selected_level = (self.selected_level - 1) % total_options
-                elif event.key == pygame.K_DOWN:
-                    self.selected_level = (self.selected_level + 1) % total_options
-                elif event.key == pygame.K_LEFT:
-                    self.selected_level = max(0, self.selected_level - 1)
-                elif event.key == pygame.K_RIGHT:
-                    self.selected_level = min(total_options - 1, self.selected_level + 1)
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.game_state = STATE_START_MENU
+            return None
+        elif gpio_states.get("action1"):
+            self.initialize_game_session(self.selected_level)
+            return None  # Stay in game loop, state changed
         return None
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    self.reset_game_state() # Go back to the main menu
-                elif event.key == pygame.K_ESCAPE: # Also allow ESC to go back
-                     self.reset_game_state()
+        gpio_states = read_gpio_input()
+        if gpio_states.get("action1"):
+            self.reset_game_state()  # Go back to the main menu
+        elif gpio_states.get("esc"):  # Also allow ESC to go back
+            self.reset_game_state()
         return None
 
     def handle_input(self):
