@@ -5,6 +5,7 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
+from gpio_manager import read_gpio_input
 
 # Add Game States
 STATE_START_MENU = 0
@@ -508,250 +509,80 @@ class FightingGame:
 
     def handle_start_input(self):
         """Handles input for the main start menu of the fighting game."""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+            return "QUIT"  # Signal exit
+        if gpio_states.get("up"):
+            self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
+        elif gpio_states.get("down"):
+            self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
+        elif gpio_states.get("select"):
+            if self.selected_start_option == 0:  # Start Game -> Go to Level Select
+                self.game_state = STATE_LEVEL_SELECT
+                self.selected_level = 1  # Reset level selection
+            elif self.selected_start_option == 1:  # Attack List
+                self.game_state = STATE_ATTACK_LIST
+            elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
                 self.running = False
-                return "QUIT"  # Signal exit
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif event.key == pygame.K_DOWN:
-                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-                elif event.key == pygame.K_RETURN:
-                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
-                        self.game_state = STATE_LEVEL_SELECT
-                        self.selected_level = 1  # Reset level selection
-                    elif self.selected_start_option == 1:  # Attack List
-                        self.game_state = STATE_ATTACK_LIST
-                    elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
-                        self.running = False  # Stop this game's loop
-                        return "QUIT"  # Signal exit from this game instance
-                elif event.key == pygame.K_ESCAPE:  # Allow ESC to exit from this game's menu
-                    self.running = False
-                    return "QUIT"
+                return "QUIT"
         return None  # No action taken this frame
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
-        total_options = self.max_levels + 1
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.game_state = STATE_START_MENU
-                    return None
-                elif event.key == pygame.K_RETURN:
-                    self.initialize_game_session(self.selected_level)
-                    return None # Stay in game loop, state changed
-                elif event.key == pygame.K_UP:
-                    self.selected_level = (self.selected_level - 1) % total_options
-                elif event.key == pygame.K_DOWN:
-                    self.selected_level = (self.selected_level + 1) % total_options
-                elif event.key == pygame.K_LEFT:
-                    self.selected_level = max(0, self.selected_level - 1)
-                elif event.key == pygame.K_RIGHT:
-                    self.selected_level = min(total_options - 1, self.selected_level + 1)
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.game_state = STATE_START_MENU
+            return None
+        elif gpio_states.get("select"):
+            self.initialize_game_session(self.selected_level)
+            return None  # Stay in game loop, state changed
+        elif gpio_states.get("up"):
+            self.selected_level = (self.selected_level - 1) % (self.max_levels + 1)
+        elif gpio_states.get("down"):
+            self.selected_level = (self.selected_level + 1) % (self.max_levels + 1)
         return None
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    self.reset_game_state() # Go back to the main menu
-                elif event.key == pygame.K_ESCAPE: # Also allow ESC to go back
-                     self.reset_game_state()
+        gpio_states = read_gpio_input()
+        if gpio_states.get("select"):
+            self.reset_game_state()  # Go back to the main menu
+        elif gpio_states.get("esc"):  # Also allow ESC to go back
+            self.reset_game_state()
         return None
 
     def handle_input(self):
         """Handles player input during the game running state."""
-        performed_attack_type = None
-
-        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.game_state = STATE_PAUSED
-                    self.selected_pause_option = 0
-                    return None
-
-                # Actions triggered on key press
-                if self.player:
-                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if event.key == pygame.K_UP:
-                        self.player._add_direction_to_buffer('up')
-                        self.player.jump() # Still trigger jump action
-                    elif event.key == pygame.K_DOWN:
-                        self.player._add_direction_to_buffer('down')
-                        self.player.crouch() # Still trigger crouch action
-                    elif event.key == pygame.K_LEFT:
-                         self.player._add_direction_to_buffer('left')
-                         # Movement itself is handled by get_pressed below
-                    elif event.key == pygame.K_RIGHT:
-                         self.player._add_direction_to_buffer('right')
-                         # Movement itself is handled by get_pressed below
-                    # --- End Buffer Input ---
-
-                    # Attack / Dodge Inputs
-                    elif event.key == pygame.K_q: # Punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif event.key == pygame.K_e: # Kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif event.key == pygame.K_SPACE:
-                        self.player.dodge() # Dodge action
-
-            if event.type == pygame.KEYUP:
-                # Stop crouching when DOWN key is released
-                if self.player and event.key == pygame.K_DOWN:
-                    self.player.stand()
-
-        # --- Continuous Movement (outside event loop, uses get_pressed) ---
-        # This block now ONLY handles the actual movement, not buffer input
-        if self.player and self.game_state == STATE_GAME_RUNNING:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
-                self.player.move_left() # Call movement method
-            if keys[pygame.K_RIGHT]:
-                self.player.move_right() # Call movement method
-
-        # --- Process Attack (if any was performed) ---
-        if performed_attack_type and self.opponent:
-            self.handle_attack(self.player, self.opponent, performed_attack_type)
-
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+            return "QUIT"
+        if gpio_states.get("left"):
+            self.player.move_left()
+        if gpio_states.get("right"):
+            self.player.move_right()
+        if gpio_states.get("up"):
+            self.player.jump()
+        if gpio_states.get("down"):
+            self.player.crouch()
+        if gpio_states.get("action1"):
+            self.player.attack("punch")
+        if gpio_states.get("action2"):
+            self.player.attack("kick")
+        if gpio_states.get("action3"):
+            self.player.dodge()
         return None
-
-    def handle_attack(self, attacker, defender, attack_name):
-        """Processes the specific attack/combo performed."""
-        print(f"Handling attack: {attack_name}")
-
-        # --- Handle Projectile Spawning ---
-        if attack_name == "Fireball":
-            # ... (Fireball logic) ...
-            spawn_x = attacker.rect.right + 10 if attacker.facing_right else attacker.rect.left - 10
-            spawn_y = attacker.rect.centery - 10
-            fireball = Projectile(spawn_x, spawn_y, attacker.facing_right, attacker)
-            self.all_sprites.add(fireball)
-            self.projectiles.add(fireball)
-            return # Fireball handled
-
-        # --- Get Attack Info ---
-        attack_info = attacker.attacks.get(attack_name)
-        if not attack_info:
-             print(f"CRITICAL WARNING: Attack info not found for '{attack_name}' in attacker.attacks!")
-             return
-
-        damage = attack_info.get("damage", 0)
-        attack_range = attack_info.get("range", attacker.rect.width)
-
-        # --- Throw Logic ---
-        if attack_name == "Throw":
-            # Check for stun on throw attempt vs dodge
-            if abs(attacker.rect.centerx - defender.rect.centerx) < attack_range and \
-               abs(attacker.rect.centery - defender.rect.centery) < attacker.rect.height:
-                if defender.is_dodging:
-                    print(f"{attacker.name} stunned attempting throw on dodging {defender.name}!")
-                    attacker.stun(1000) # Stun attacker for 1 second
-                    return # Stop throw processing
-                # ... (rest of throw success/fail logic) ...
-                if not defender.is_dodging and not defender.is_crouching:
-                    print(f"{attacker.name} throws {defender.name}!")
-                    defender.take_damage(damage)
-                    throw_distance = 150
-                    defender.rect.x += throw_distance if attacker.facing_right else -throw_distance
-                else: print(f"{attacker.name}'s throw failed (dodged/blocked)!")
-            else: print(f"{attacker.name}'s throw missed (out of range)!")
-            return # Throw handled or missed
-
-        # --- Standard Melee Damage Application (Handles Punch, Kick, SpinKick) ---
-        # Check for stun FIRST if defender is dodging
-        if defender.is_dodging:
-            # Calculate potential hit area to see if the attack *would* have hit
-            attack_rect_width = attack_range
-            attack_rect_height = attacker.rect.height
-            if attacker.facing_right:
-                attack_rect = pygame.Rect(attacker.rect.right, attacker.rect.top, attack_rect_width, attack_rect_height)
-            else:
-                attack_rect = pygame.Rect(attacker.rect.left - attack_rect_width, attacker.rect.top, attack_rect_width, attack_rect_height)
-
-            # If the attack would have collided with the dodging defender
-            if attack_rect.colliderect(defender.rect):
-                print(f"{attacker.name} stunned attacking dodging {defender.name} with {attack_name}!")
-                attacker.stun(1000) # Stun attacker for 1 second
-                return # Stop attack processing
-
-        # If defender is NOT dodging, proceed with damage application
-        self.apply_damage(defender, damage, attacker.facing_right, attacker, attack_name, attack_range)
-
-    def apply_damage(self, defender, damage, facing_right, attacker, attack_type, attack_range):
-        """Applies damage based on hitbox collision, checks if defender can take damage."""
-        # Immunity check
-        if hasattr(defender, 'can_take_damage') and not defender.can_take_damage:
-            return
-
-        # Dodge check (handled in handle_attack for stun)
-        if defender.is_dodging:
-             return # Dodging characters take no damage
-
-        # --- Handle Projectile Damage Directly ---
-        if attack_type == "Projectile":
-            # Collision already confirmed before calling apply_damage for projectiles
-            if defender.is_crouching: # Blocking check
-                print(f"{defender.name} blocked Projectile!")
-                defender.take_damage(damage * 0.25)
-            else: # Apply full damage
-                defender.take_damage(damage)
-                print(f"{defender.name} takes {damage} damage from Projectile!")
-            return # Projectile damage handled
-
-        # --- Handle Melee Damage (Calculate Hitbox) ---
-        else:
-            # Calculate attack hitbox based on attacker's position, facing direction, and attack range
-            attack_rect_width = attack_range
-            attack_rect_height = attacker.rect.height # Use attacker's height for the hitbox vertical size
-
-            if facing_right:
-                # Hitbox starts at the right edge of the attacker and extends
-                attack_rect = pygame.Rect(attacker.rect.right, attacker.rect.top, attack_rect_width, attack_rect_height)
-            else:
-                # Hitbox starts attack_range pixels to the left of the attacker's left edge
-                attack_rect = pygame.Rect(attacker.rect.left - attack_rect_width, attacker.rect.top, attack_rect_width, attack_rect_height)
-
-            # Check for collision between the attack hitbox and the defender's rectangle
-            if attack_rect.colliderect(defender.rect):
-                 if defender.is_crouching: # Blocking check
-                     print(f"{defender.name} blocked {attack_type}!")
-                     defender.take_damage(damage * 0.25)
-                 else: # Apply full damage
-                    defender.take_damage(damage)
-                    print(f"{defender.name} takes {damage} damage from {attack_type}!")
-            # else: Melee attack missed
 
     def run(self):
         """Main loop for the Fighting Game instance."""
         self.running = True
-        # Ensure initial state is set (e.g., start menu) if not done in init
-        if self.game_state is None: # Add a check just in case
-             self.game_state = STATE_START_MENU
-
         while self.running:
-            dt = self.clock.tick(60) / 1000.0 # Delta time
-            action = None # Action to take based on input handling
-
-            # --- State Machine Logic ---
             if self.game_state == STATE_START_MENU:
                 self.draw_start_menu()
                 action = self.handle_start_input()
-                if action == "QUIT": # Check if handle_start_input signals exit
-                    self.running = False # Stop this game's loop
+                if action == "QUIT":
+                    self.running = False
 
             elif self.game_state == STATE_LEVEL_SELECT:
                 self.draw_level_select()
@@ -761,112 +592,42 @@ class FightingGame:
 
             elif self.game_state == STATE_ATTACK_LIST:
                 self.draw_attack_list()
-                # Handle input for attack list screen (including scrolling)
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                    if event.type == pygame.QUIT:
-                        self.running = False; action = "QUIT"; break
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.game_state = STATE_START_MENU
-                            self.attack_list_scroll_offset = 0 # Reset scroll on exit
-                            break
-                        elif event.key == pygame.K_UP:
-                            self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                        elif event.key == pygame.K_DOWN:
-                            max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
-                            self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
-                if action == "QUIT": break
+                gpio_states = read_gpio_input()
+                if gpio_states.get("esc"):
+                    self.game_state = STATE_START_MENU
+                    self.attack_list_scroll_offset = 0  # Reset scroll on exit
+                elif gpio_states.get("up"):
+                    self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
+                elif gpio_states.get("down"):
+                    max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
+                    self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
 
             elif self.game_state == STATE_GAME_RUNNING:
-                # Handle game input
                 action = self.handle_input()
                 if action == "QUIT":
-                     self.running = False
-                     break # Exit loop immediately on QUIT
-
-                # Update Sprites
-                if self.player: self.player.update()
-                if self.opponent:
-                    opponent_action_name = self.opponent.update(self.player)
-                    if opponent_action_name:
-                        self.handle_attack(self.opponent, self.player, opponent_action_name)
-
-                # Update Projectiles
-                self.projectiles.update(self.screen_width)
-
-                # Check Projectile Collisions
-                for proj in self.projectiles:
-                    target = None
-                    if proj.owner == self.player and self.opponent:
-                        target = self.opponent
-                    elif proj.owner == self.opponent and self.player:
-                        target = self.player
-
-                    if target and pygame.sprite.collide_rect(proj, target):
-                        print(f"{target.name} hit by projectile!")
-                        self.apply_damage(target, proj.damage, proj.velocity_x > 0, proj.owner, "Projectile", 0) # Apply damage
-                        proj.kill() # Remove projectile on hit
-
-                # --- Game Over Check (Modified for Practice) ---
-                if self.current_level != 0: # Only check game over in non-practice levels
-                    if self.player and self.opponent and (not self.player.is_alive() or not self.opponent.is_alive()):
-                        if not self.player.is_alive():
-                            self.winner = "Opponent"
-                            self.game_over_message = "YOU LOSE!"
-                            self.game_state = STATE_GAME_OVER_LOSE
-                        else:
-                            self.winner = "Player"
-                            self.game_over_message = "YOU WIN!"
-                            self.game_state = STATE_GAME_OVER_WIN
-                        print(f"Level {self.current_level}: {self.winner} wins!")
-
-                # --- Drawing ---
-                if self.current_background:
-                    self.screen.blit(self.current_background, (0, 0))
-                else:
-                    self.screen.fill((0, 0, 0)) # Fallback background
-                self.all_sprites.draw(self.screen)
-                # Draw health bars
-                if self.player: self.draw_health_bar(self.screen, self.player, 10, 10)
-                if self.opponent: self.draw_health_bar(self.screen, self.opponent, self.screen_width - 210, 10)
-
+                    self.running = False
 
             elif self.game_state == STATE_PAUSED:
-                # Draw semi-transparent overlay
-                overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 180))
-                self.screen.blit(overlay, (0, 0))
-                # Draw pause menu options
-                pause_title = self.title_font.render("Paused", True, (255, 255, 0))
-                pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 150))
-                self.screen.blit(pause_title, pause_rect)
-                for i, option in enumerate(self.pause_options):
-                    text_color = (0, 255, 255) if i == self.selected_pause_option else (180, 180, 180)
-                    option_text = self.font.render(option, True, text_color)
-                    option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
-                    self.screen.blit(option_text, option_rect)
-                # Handle pause input
-                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
-                     if event.type == pygame.QUIT: self.running = False; break
-                     if event.type == pygame.KEYDOWN:
-                          if event.key == pygame.K_ESCAPE: self.game_state = STATE_GAME_RUNNING # Resume
-                          elif event.key == pygame.K_UP: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                          elif event.key == pygame.K_DOWN: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                          elif event.key == pygame.K_RETURN:
-                               if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
-                               elif self.selected_pause_option == 1: # Quit to Start Menu
-                                    self.reset_game_state() # Reset to fighting game start menu
+                gpio_states = read_gpio_input()
+                if gpio_states.get("esc"):
+                    self.game_state = STATE_GAME_RUNNING  # Resume
+                elif gpio_states.get("up"):
+                    self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                elif gpio_states.get("down"):
+                    self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                elif gpio_states.get("select"):
+                    if self.selected_pause_option == 0:
+                        self.game_state = STATE_GAME_RUNNING  # Resume
+                    elif self.selected_pause_option == 1:
+                        self.reset_game_state()  # Quit to Start Menu
 
-            elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
+            elif self.game_state in (STATE_GAME_OVER_WIN, STATE_GAME_OVER_LOSE):
                 self.draw_game_over_screen()
                 action = self.handle_game_over_input()
                 if action == "QUIT":
                     self.running = False
 
-            # Update the display
             pygame.display.flip()
-
-        print("Exiting Fighting Game run loop.") # Indicate loop exit
 
     def reset_game_state(self):
         """Resets the game to the initial start menu state."""
