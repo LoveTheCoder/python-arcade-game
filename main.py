@@ -132,7 +132,7 @@ class GameMenu:
         return None
 
     def run(self):
-        bullet_hell_game = BulletHellGame()  # if these work correctly
+        bullet_hell_game = BulletHellGame()
         while self.running:
             if self.in_menu:
                 self.draw_menu()
@@ -147,7 +147,6 @@ class GameMenu:
                     self.in_menu = True
                 elif action == "Fighting Game":
                     self.in_menu = False
-                    # Create a new instance so that internal state is fresh
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
