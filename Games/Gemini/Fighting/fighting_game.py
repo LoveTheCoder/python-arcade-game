@@ -5,19 +5,19 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
-import RPi.GPIO as GPIO
+from gpiozero import Button
 
 # GPIO Pin Definitions
 GPIO_PINS = {
-    "down": 2,
-    "left": 3,
-    "up": 4,
-    "right": 5,
-    "esc": 6,
-    "select": 7,
-    "action1": 8,
-    "action2": 9,
-    "action3": 10,
+    "down": Button(2, pull_up=True),
+    "left": Button(3, pull_up=True),
+    "up": Button(4, pull_up=True),
+    "right": Button(5, pull_up=True),
+    "esc": Button(6, pull_up=True),
+    "select": Button(7, pull_up=True),
+    "action1": Button(8, pull_up=True),
+    "action2": Button(9, pull_up=True),
+    "action3": Button(10, pull_up=True),
 }
 
 # GPIO Setup
