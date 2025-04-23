@@ -15,11 +15,7 @@ GPIO_PINS = {
 
 def read_gpio_input():
     """Reads GPIO input states and returns a dictionary of button states."""
-    try:
-        return {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
-    except Exception as e:
-        print(f"GPIO read error: {e}")
-        return {key: False for key in GPIO_PINS.keys()}
+    return {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
 
 def cleanup_gpio():
     """Cleans up all GPIO resources."""

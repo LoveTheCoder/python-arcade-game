@@ -361,16 +361,16 @@ class Player(pygame.sprite.Sprite):
         self.speedx = 0
         self.speedy = 0
 
-        if gpio_states.get("left", False):
+        if gpio_states["left"]:
             self.speedx = -self.base_speed
-        if gpio_states.get("right", False):
+        if gpio_states["right"]:
             self.speedx = self.base_speed
-        if gpio_states.get("up", False):
+        if gpio_states["up"]:
             self.speedy = -self.base_speed
-        if gpio_states.get("down", False):
+        if gpio_states["down"]:
             self.speedy = self.base_speed
 
-        if gpio_states.get("action1", False):  # Replace key for shooting
+        if gpio_states["action1"]:  # Replace key for shooting
             self.shoot()
 
         self.rect.x += self.speedx
