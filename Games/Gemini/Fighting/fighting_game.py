@@ -603,9 +603,22 @@ class FightingGame:
                     self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
 
             elif self.game_state == STATE_GAME_RUNNING:
-                action = self.handle_input()
+                self.screen.blit(self.current_background, (0, 0))  # Draw the background
+                self.all_sprites.update()  # Update all sprites
+                self.all_sprites.draw(self.screen)  # Draw all sprites
+                self.draw_health_bar(self.screen, self.player, 20, 20)  # Draw player health bar
+                self.draw_health_bar(self.screen, self.opponent, self.screen_width - 220, 20)  # Draw opponent health bar
+
+                action = self.handle_input()  # Handle player input
                 if action == "QUIT":
                     self.running = False
+
+                if self.player.health <= 0:
+                    self.game_state = STATE_GAME_OVER_LOSE
+                    self.game_over_message = "You Lose!"
+                elif self.opponent.health <= 0:
+                    self.game_state = STATE_GAME_OVER_WIN
+                    self.game_over_message = "You Win!"
 
             elif self.game_state == STATE_PAUSED:
                 gpio_states = read_gpio_input()
