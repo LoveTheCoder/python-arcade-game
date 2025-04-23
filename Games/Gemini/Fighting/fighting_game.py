@@ -523,7 +523,10 @@ class FightingGame:
                         performed_attack_type = self.player.attack("kick")
                     elif self.gpio_states.get("action3") or keys[pygame.K_SPACE]:
                         self.player.dodge()
-
+        if self.gpio_states.get("esc"):
+            self.game_state = STATE_PAUSED
+            self.selected_pause_option = 0
+            return None
         if self.gpio_states.get("action1") or keys[pygame.K_q]:
             performed_attack_type = self.player.attack("punch")
         elif self.gpio_states.get("action2") or keys[pygame.K_e]:
