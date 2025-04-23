@@ -118,7 +118,11 @@ class GameMenu:
         pygame.display.flip()
 
     def handle_input(self):
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
 
         # Debugging: Print the gpio_states to verify input
         print(f"GPIO States: {gpio_states}")

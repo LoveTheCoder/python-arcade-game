@@ -508,55 +508,59 @@ class FightingGame:
         self.screen.blit(prompt_text, prompt_rect)
 
     def handle_start_input(self):
-        gpio_states = read_gpio_input() or {}
+        """Handles input for the main start menu of the fighting game."""
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if gpio_states:
-                if gpio_states.get("up", False):
-                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif gpio_states.get("down", False):
-                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-                elif gpio_states.get("select", False):
-                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
-                        self.game_state = STATE_LEVEL_SELECT
-                        self.selected_level = 1
-                    elif self.selected_start_option == 1:  # Attack List
-                        self.game_state = STATE_ATTACK_LIST
-                    elif self.selected_start_option == 2:  # Exit
-                        self.running = False
-                        return "QUIT"
+        if gpio_states.get("up", False):
+            self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
+        elif gpio_states.get("down", False):
+            self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
+        elif gpio_states.get("select", False):
+            if self.selected_start_option == 0:  # Start Game
+                self.game_state = STATE_LEVEL_SELECT
+                self.selected_level = 1
+            elif self.selected_start_option == 1:  # Attack List
+                self.game_state = STATE_ATTACK_LIST
+            elif self.selected_start_option == 2:  # Exit
+                self.running = False
+                return "QUIT"
         return None
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
-        gpio_states = read_gpio_input() or {}
-        total_options = self.max_levels + 1
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if gpio_states:
-                if gpio_states.get("esc"):
-                    self.game_state = STATE_START_MENU
-                    return None
-                elif gpio_states.get("select"):
-                    self.initialize_game_session(self.selected_level)
-                    return None # Stay in game loop, state changed
-                elif gpio_states.get("up"):
-                    self.selected_level = (self.selected_level - 1) % total_options
-                elif gpio_states.get("down"):
-                    self.selected_level = (self.selected_level + 1) % total_options
-                elif gpio_states.get("left"):
-                    self.selected_level = max(0, self.selected_level - 1)
-                elif gpio_states.get("right"):
-                    self.selected_level = min(total_options - 1, self.selected_level + 1)
+        if gpio_states.get("up", False):
+            self.selected_level = max(0, self.selected_level - 1)
+        elif gpio_states.get("down", False):
+            self.selected_level = min(self.max_levels, self.selected_level + 1)
+        elif gpio_states.get("select", False):
+            self.initialize_game_session(self.selected_level)
+        elif gpio_states.get("esc", False):
+            self.game_state = STATE_START_MENU
         return None
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -571,7 +575,11 @@ class FightingGame:
     def handle_input(self):
         """Handles player input during the game running state."""
         performed_attack_type = None
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
 
         # --- Single Event Loop (Handles KEYDOWN for buffer) ---
         for event in pygame.event.get():
@@ -758,7 +766,11 @@ class FightingGame:
 
                 elif self.game_state == STATE_ATTACK_LIST:
                     self.draw_attack_list()
-                    gpio_states = read_gpio_input() or {}
+                    try:
+                        gpio_states = read_gpio_input() or {}
+                    except Exception as e:
+                        print(f"Error reading GPIO input: {e}")
+                        gpio_states = {}
                     # Handle input for attack list screen (including scrolling)
                     for event in pygame.event.get([pygame.QUIT]):
                         if event.type == pygame.QUIT:
@@ -843,6 +855,11 @@ class FightingGame:
                         option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
                         self.screen.blit(option_text, option_rect)
                     # Handle pause input
+                    try:
+                        gpio_states = read_gpio_input() or {}
+                    except Exception as e:
+                        print(f"Error reading GPIO input: {e}")
+                        gpio_states = {}
                     for event in pygame.event.get([pygame.QUIT]):
                         if event.type == pygame.QUIT: self.running = False; break
                         if gpio_states:
@@ -867,6 +884,9 @@ class FightingGame:
         except Exception as e:
             print(f"An error occurred in FightingGame: {e}")
             self.running = False
+        finally:
+            cleanup_gpio()
+            print("Exiting program. GPIO cleanup handled.")
 
     def reset_game_state(self):
         """Resets the game to the initial start menu state."""

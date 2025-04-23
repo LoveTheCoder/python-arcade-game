@@ -15,11 +15,13 @@ GPIO_PINS = {
 }
 
 def read_gpio_input():
-    """Reads GPIO input states with debounce and returns a dictionary of button states."""
-    states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
+    """Reads GPIO input states with improved debounce logic and returns a dictionary of button states."""
+    initial_states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
     sleep(0.05)  # Debounce delay (50ms)
-    confirmed_states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
-    return {key: state for key, state in confirmed_states.items() if state == states[key]}
+    final_states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
+
+    # Only return states that remained consistent during the debounce period
+    return {key: state for key, state in final_states.items() if state == initial_states[key]}
 
 def cleanup_gpio():
     """Cleans up all GPIO resources."""

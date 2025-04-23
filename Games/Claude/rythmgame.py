@@ -524,24 +524,28 @@ def render(screen, game_state, notes, score_tracker, menu_font):
 
 def handle_menu_input(event, game_state):
     """Handle menu navigation input"""
-    gpio_states = read_gpio_input() or {}
-    if gpio_states["up"]:
+    try:
+        gpio_states = read_gpio_input() or {}
+    except Exception as e:
+        print(f"Error reading GPIO input: {e}")
+        gpio_states = {}
+    if gpio_states.get("up", False):
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
-        # No change for menu item 2 (speed) or 3 (exit)
-    elif gpio_states["down"]:
+    elif gpio_states.get("down", False):
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty + 1) % len(game_state.difficulties)
-    elif gpio_states["left"] and game_state.selected_menu_item == 2:
+    elif gpio_states.get("left", False) and game_state.selected_menu_item == 2:
         game_state.scroll_speed = max(MIN_SCROLL_SPEED, game_state.scroll_speed - 1)
-    elif gpio_states["right"] and game_state.selected_menu_item == 2:
+    elif gpio_states.get("right", False) and game_state.selected_menu_item == 2:
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
-    elif gpio_states["esc"]:
-        game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4  # Now 4 items (0,1,2,3)
+    elif gpio_states.get("select", False):
+        if game_state.selected_menu_item == 3:  # Exit to Main Menu
+            game_state.current_state = STATE_MENU
 
 def calculate_music_delay(scroll_speed):
     """Calculate delay based on scroll speed - slower speed needs more delay"""
@@ -567,7 +571,11 @@ def start_song(game_state):
 
 def main():
     try:
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
         pygame.init()
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("4K Rhythm Game")
@@ -682,6 +690,9 @@ def main():
         pygame.quit()
     except Exception as e:
         print(f"An error occurred in Rhythm Game: {e}")
+    finally:
+        cleanup_gpio()
+        print("Exiting program. GPIO cleanup handled.")
 
 def draw_menu(screen, font, difficulties, selected_difficulty, scroll_speed, selected_song_index, selected_menu_item):
     """Draw the main menu screen with options moved upward"""
@@ -931,4 +942,5 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        print("")
+        cleanup_gpio()
+        print("Exiting program. GPIO cleanup handled.")

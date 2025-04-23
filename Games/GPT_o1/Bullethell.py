@@ -356,7 +356,11 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.circle(player_image, BLACK, (15, 15), 3)   # Black hitbox
 
     def update(self):
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
 
         self.speedx = 0
         self.speedy = 0
@@ -1023,7 +1027,12 @@ def draw_hud():
         screen.blit(watermark, (SCREEN_WIDTH - watermark.get_width() - 10, 10))
         
 def start_menu(screen, font, clock):
-    gpio_states = read_gpio_input() or {}
+    try:
+        gpio_states = read_gpio_input() or {}
+    except Exception as e:
+        print(f"Error reading GPIO input: {e}")
+        gpio_states = {}
+
     options = ["Start Game", "Return to Main Menu"]
     selected = 0
     title_font = pygame.font.SysFont("Arial", 72, bold=True)
@@ -1092,7 +1101,12 @@ class BulletHellGame:
         # (Copy existing initialization code)
 
     def handle_events(self):
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -1113,7 +1127,12 @@ class BulletHellGame:
             self.running = False
             
     def game_loop(self):
-        gpio_states = read_gpio_input() or {}
+        try:
+            gpio_states = read_gpio_input() or {}
+        except Exception as e:
+            print(f"Error reading GPIO input: {e}")
+            gpio_states = {}
+
         global game_over, boss_spawned, boss_active, level_complete, level, game_won
         global wave_number, wave_start_time, level_start_time
         wave_start_time = pygame.time.get_ticks()
@@ -1294,7 +1313,12 @@ class BulletHellGame:
 
 # Main Game Loop
 def main():
-    gpio_states = read_gpio_input() or {}
+    try:
+        gpio_states = read_gpio_input() or {}
+    except Exception as e:
+        print(f"Error reading GPIO input: {e}")
+        gpio_states = {}
+
     global game_over, boss_spawned, boss_active, level_complete, level, game_won
     global wave_number, wave_start_time, level_start_time
     running = True
@@ -1444,7 +1468,8 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except Exception as e:
+        print(f"An error occurred: {e}")
     finally:
-        print()
-    
-    #test 2
+        cleanup_gpio()
+        print("Exiting program. GPIO cleanup handled.")
