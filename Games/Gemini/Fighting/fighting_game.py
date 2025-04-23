@@ -5,7 +5,7 @@ import random
 import math
 from .character import Character
 from .ai_opponent import AIOpponent
-from gpio_manager import read_gpio_input, cleanup_gpio
+from gpio_manager import read_gpio_input
 
 # Add Game States
 STATE_START_MENU = 0
@@ -509,133 +509,81 @@ class FightingGame:
 
     def handle_start_input(self):
         """Handles input for the main start menu of the fighting game."""
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-                return "QUIT"
-        if gpio_states.get("up", False):
-            self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-        elif gpio_states.get("down", False):
-            self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-        elif gpio_states.get("select", False):
-            if self.selected_start_option == 0:  # Start Game
-                self.game_state = STATE_LEVEL_SELECT
-                self.selected_level = 1
-            elif self.selected_start_option == 1:  # Attack List
-                self.game_state = STATE_ATTACK_LIST
-            elif self.selected_start_option == 2:  # Exit
-                self.running = False
-                return "QUIT"
-        return None
+                return "QUIT"  # Signal exit
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
+                elif event.key == pygame.K_DOWN:
+                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
+                elif event.key == pygame.K_RETURN:
+                    if self.selected_start_option == 0:  # Start Game -> Go to Level Select
+                        self.game_state = STATE_LEVEL_SELECT
+                        self.selected_level = 1  # Reset level selection
+                    elif self.selected_start_option == 1:  # Attack List
+                        self.game_state = STATE_ATTACK_LIST
+                    elif self.selected_start_option == 2:  # Exit (Return to main arcade menu)
+                        self.running = False  # Stop this game's loop
+                        return "QUIT"  # Signal exit from this game instance
+                elif event.key == pygame.K_ESCAPE:  # Allow ESC to exit from this game's menu
+                    self.running = False
+                    return "QUIT"
+        return None  # No action taken this frame
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
+        total_options = self.max_levels + 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-        if gpio_states.get("up", False):
-            self.selected_level = max(0, self.selected_level - 1)
-        elif gpio_states.get("down", False):
-            self.selected_level = min(self.max_levels, self.selected_level + 1)
-        elif gpio_states.get("select", False):
-            self.initialize_game_session(self.selected_level)
-        elif gpio_states.get("esc", False):
-            self.game_state = STATE_START_MENU
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game_state = STATE_START_MENU
+                    return None
+                elif event.key == pygame.K_RETURN:
+                    self.initialize_game_session(self.selected_level)
+                    return None # Stay in game loop, state changed
+                elif event.key == pygame.K_UP:
+                    self.selected_level = (self.selected_level - 1) % total_options
+                elif event.key == pygame.K_DOWN:
+                    self.selected_level = (self.selected_level + 1) % total_options
+                elif event.key == pygame.K_LEFT:
+                    self.selected_level = max(0, self.selected_level - 1)
+                elif event.key == pygame.K_RIGHT:
+                    self.selected_level = min(total_options - 1, self.selected_level + 1)
         return None
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
-            if gpio_states:
-                if gpio_states.get("select"):
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
                     self.reset_game_state() # Go back to the main menu
-                elif gpio_states.get("esc"): # Also allow ESC to go back
+                elif event.key == pygame.K_ESCAPE: # Also allow ESC to go back
                      self.reset_game_state()
         return None
 
     def handle_input(self):
-        """Handles player input during the game running state."""
-        performed_attack_type = None
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
-
-        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-
-            if gpio_states:
-                if gpio_states.get("esc"):
-                    self.game_state = STATE_PAUSED
-                    self.selected_pause_option = 0
-                    return None
-
-                # Actions triggered on key press
-                if self.player:
-                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if gpio_states.get("up"):
-                        self.player._add_direction_to_buffer('up')
-                        self.player.jump() # Still trigger jump action
-                    elif gpio_states.get("down"):
-                        self.player._add_direction_to_buffer('down')
-                        self.player.crouch() # Still trigger crouch action
-                    elif gpio_states.get("left"):
-                         self.player._add_direction_to_buffer('left')
-                         # Movement itself is handled by get_pressed below
-                    elif gpio_states.get("right"):
-                         self.player._add_direction_to_buffer('right')
-                         # Movement itself is handled by get_pressed below
-                    # --- End Buffer Input ---
-
-                    # Attack / Dodge Inputs
-                    elif gpio_states.get("action1"): # Punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif gpio_states.get("action2"): # Kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif gpio_states.get("action3"): # Special Move (e.g., Fireball)
-                        self.player.dodge() # Dodge action
-
-            if gpio_states.get("down"):
-                # Stop crouching when DOWN key is released
-                if self.player:
-                    self.player.stand()
-
-        # --- Continuous Movement (outside event loop, uses get_pressed) ---
-        # This block now ONLY handles the actual movement, not buffer input
-        if self.player and self.game_state == STATE_GAME_RUNNING:
-            if gpio_states.get("left"):
-                self.player.move_left() # Call movement method
-            if gpio_states.get("right"):
-                self.player.move_right() # Call movement method
-
-        # --- Process Attack (if any was performed) ---
-        if performed_attack_type and self.opponent:
-            self.handle_attack(self.player, self.opponent, performed_attack_type)
-
-        return None
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+            return "QUIT"
+        if gpio_states.get("left"):
+            self.player.move_left()
+        if gpio_states.get("right"):
+            self.player.move_right()
+        if gpio_states.get("action1"):
+            self.player.attack("punch")
+        if gpio_states.get("action2"):
+            self.player.attack("kick")
+        if gpio_states.get("action3"):
+            self.player.dodge()
 
     def handle_attack(self, attacker, defender, attack_name):
         """Processes the specific attack/combo performed."""
@@ -745,148 +693,136 @@ class FightingGame:
 
     def run(self):
         """Main loop for the Fighting Game instance."""
-        try:
-            self.running = True
-            while self.running:
-                dt = self.clock.tick(60) / 1000.0  # Delta time
-                action = None  # Action to take based on input handling
+        self.running = True
+        # Ensure initial state is set (e.g., start menu) if not done in init
+        if self.game_state is None: # Add a check just in case
+             self.game_state = STATE_START_MENU
 
-                # --- State Machine Logic ---
-                if self.game_state == STATE_START_MENU:
-                    self.draw_start_menu()
-                    action = self.handle_start_input()
-                    if action == "QUIT":  # Check if handle_start_input signals exit
-                        self.running = False  # Stop this game's loop
+        while self.running:
+            dt = self.clock.tick(60) / 1000.0 # Delta time
+            action = None # Action to take based on input handling
 
-                elif self.game_state == STATE_LEVEL_SELECT:
-                    self.draw_level_select()
-                    action = self.handle_level_select_input()
-                    if action == "QUIT":
-                        self.running = False
+            # --- State Machine Logic ---
+            if self.game_state == STATE_START_MENU:
+                self.draw_start_menu()
+                action = self.handle_start_input()
+                if action == "QUIT": # Check if handle_start_input signals exit
+                    self.running = False # Stop this game's loop
 
-                elif self.game_state == STATE_ATTACK_LIST:
-                    self.draw_attack_list()
-                    try:
-                        gpio_states = read_gpio_input() or {}
-                    except Exception as e:
-                        print(f"Error reading GPIO input: {e}")
-                        gpio_states = {}
-                    # Handle input for attack list screen (including scrolling)
-                    for event in pygame.event.get([pygame.QUIT]):
-                        if event.type == pygame.QUIT:
-                            self.running = False; action = "QUIT"; break
-                        if gpio_states:
-                            if gpio_states.get("esc"):
-                                self.game_state = STATE_START_MENU
-                                self.attack_list_scroll_offset = 0  # Reset scroll on exit
-                                break
-                            elif gpio_states.get("up"):
-                                self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
-                            elif gpio_states.get("down"):
-                                max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
-                                self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
-                    if action == "QUIT": break
+            elif self.game_state == STATE_LEVEL_SELECT:
+                self.draw_level_select()
+                action = self.handle_level_select_input()
+                if action == "QUIT":
+                    self.running = False
 
-                elif self.game_state == STATE_GAME_RUNNING:
-                    # Handle game input
-                    action = self.handle_input()
-                    if action == "QUIT":
-                        self.running = False
-                        break  # Exit loop immediately on QUIT
+            elif self.game_state == STATE_ATTACK_LIST:
+                self.draw_attack_list()
+                # Handle input for attack list screen (including scrolling)
+                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                    if event.type == pygame.QUIT:
+                        self.running = False; action = "QUIT"; break
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            self.game_state = STATE_START_MENU
+                            self.attack_list_scroll_offset = 0 # Reset scroll on exit
+                            break
+                        elif event.key == pygame.K_UP:
+                            self.attack_list_scroll_offset = max(0, self.attack_list_scroll_offset - 1)
+                        elif event.key == pygame.K_DOWN:
+                            max_scroll = max(0, self.attack_list_total_items - self.attack_list_visible_items)
+                            self.attack_list_scroll_offset = min(max_scroll, self.attack_list_scroll_offset + 1)
+                if action == "QUIT": break
 
-                    # Update Sprites
-                    if self.player: self.player.update()
-                    if self.opponent:
-                        opponent_action_name = self.opponent.update(self.player)
-                        if opponent_action_name:
-                            self.handle_attack(self.opponent, self.player, opponent_action_name)
+            elif self.game_state == STATE_GAME_RUNNING:
+                # Handle game input
+                action = self.handle_input()
+                if action == "QUIT":
+                     self.running = False
+                     break # Exit loop immediately on QUIT
 
-                    # Update Projectiles
-                    self.projectiles.update(self.screen_width)
+                # Update Sprites
+                if self.player: self.player.update()
+                if self.opponent:
+                    opponent_action_name = self.opponent.update(self.player)
+                    if opponent_action_name:
+                        self.handle_attack(self.opponent, self.player, opponent_action_name)
 
-                    # Check Projectile Collisions
-                    for proj in self.projectiles:
-                        target = None
-                        if proj.owner == self.player and self.opponent:
-                            target = self.opponent
-                        elif proj.owner == self.opponent and self.player:
-                            target = self.player
+                # Update Projectiles
+                self.projectiles.update(self.screen_width)
 
-                        if target and pygame.sprite.collide_rect(proj, target):
-                            print(f"{target.name} hit by projectile!")
-                            self.apply_damage(target, proj.damage, proj.velocity_x > 0, proj.owner, "Projectile", 0)  # Apply damage
-                            proj.kill()  # Remove projectile on hit
+                # Check Projectile Collisions
+                for proj in self.projectiles:
+                    target = None
+                    if proj.owner == self.player and self.opponent:
+                        target = self.opponent
+                    elif proj.owner == self.opponent and self.player:
+                        target = self.player
 
-                    # --- Game Over Check (Modified for Practice) ---
-                    if self.current_level != 0:  # Only check game over in non-practice levels
-                        if self.player and self.opponent and (not self.player.is_alive() or not self.opponent.is_alive()):
-                            if not self.player.is_alive():
-                                self.winner = "Opponent"
-                                self.game_over_message = "YOU LOSE!"
-                                self.game_state = STATE_GAME_OVER_LOSE
-                            else:
-                                self.winner = "Player"
-                                self.game_over_message = "YOU WIN!"
-                                self.game_state = STATE_GAME_OVER_WIN
-                            print(f"Level {self.current_level}: {self.winner} wins!")
+                    if target and pygame.sprite.collide_rect(proj, target):
+                        print(f"{target.name} hit by projectile!")
+                        self.apply_damage(target, proj.damage, proj.velocity_x > 0, proj.owner, "Projectile", 0) # Apply damage
+                        proj.kill() # Remove projectile on hit
 
-                    # --- Drawing ---
-                    if self.current_background:
-                        self.screen.blit(self.current_background, (0, 0))
-                    else:
-                        self.screen.fill((0, 0, 0))  # Fallback background
-                    self.all_sprites.draw(self.screen)
-                    # Draw health bars
-                    if self.player: self.draw_health_bar(self.screen, self.player, 10, 10)
-                    if self.opponent: self.draw_health_bar(self.screen, self.opponent, self.screen_width - 210, 10)
+                # --- Game Over Check (Modified for Practice) ---
+                if self.current_level != 0: # Only check game over in non-practice levels
+                    if self.player and self.opponent and (not self.player.is_alive() or not self.opponent.is_alive()):
+                        if not self.player.is_alive():
+                            self.winner = "Opponent"
+                            self.game_over_message = "YOU LOSE!"
+                            self.game_state = STATE_GAME_OVER_LOSE
+                        else:
+                            self.winner = "Player"
+                            self.game_over_message = "YOU WIN!"
+                            self.game_state = STATE_GAME_OVER_WIN
+                        print(f"Level {self.current_level}: {self.winner} wins!")
 
-                elif self.game_state == STATE_PAUSED:
-                    # Draw semi-transparent overlay
-                    overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
-                    overlay.fill((0, 0, 0, 180))
-                    self.screen.blit(overlay, (0, 0))
-                    # Draw pause menu options
-                    pause_title = self.title_font.render("Paused", True, (255, 255, 0))
-                    pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 150))
-                    self.screen.blit(pause_title, pause_rect)
-                    for i, option in enumerate(self.pause_options):
-                        text_color = (0, 255, 255) if i == self.selected_pause_option else (180, 180, 180)
-                        option_text = self.font.render(option, True, text_color)
-                        option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
-                        self.screen.blit(option_text, option_rect)
-                    # Handle pause input
-                    try:
-                        gpio_states = read_gpio_input() or {}
-                    except Exception as e:
-                        print(f"Error reading GPIO input: {e}")
-                        gpio_states = {}
-                    for event in pygame.event.get([pygame.QUIT]):
-                        if event.type == pygame.QUIT: self.running = False; break
-                        if gpio_states:
-                            if gpio_states.get("esc"): self.game_state = STATE_GAME_RUNNING  # Resume
-                            elif gpio_states.get("up"): self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
-                            elif gpio_states.get("down"): self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
-                            elif gpio_states.get("select"):
-                                if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING  # Resume
-                                elif self.selected_pause_option == 1:  # Quit to Start Menu
-                                    self.reset_game_state()  # Reset to fighting game start menu
+                # --- Drawing ---
+                if self.current_background:
+                    self.screen.blit(self.current_background, (0, 0))
+                else:
+                    self.screen.fill((0, 0, 0)) # Fallback background
+                self.all_sprites.draw(self.screen)
+                # Draw health bars
+                if self.player: self.draw_health_bar(self.screen, self.player, 10, 10)
+                if self.opponent: self.draw_health_bar(self.screen, self.opponent, self.screen_width - 210, 10)
 
-                elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
-                    self.draw_game_over_screen()
-                    action = self.handle_game_over_input()
-                    if action == "QUIT":
-                        self.running = False
 
-                # Update the display
-                pygame.display.flip()
+            elif self.game_state == STATE_PAUSED:
+                # Draw semi-transparent overlay
+                overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                self.screen.blit(overlay, (0, 0))
+                # Draw pause menu options
+                pause_title = self.title_font.render("Paused", True, (255, 255, 0))
+                pause_rect = pause_title.get_rect(center=(self.screen_width // 2, 150))
+                self.screen.blit(pause_title, pause_rect)
+                for i, option in enumerate(self.pause_options):
+                    text_color = (0, 255, 255) if i == self.selected_pause_option else (180, 180, 180)
+                    option_text = self.font.render(option, True, text_color)
+                    option_rect = option_text.get_rect(center=(self.screen_width // 2, 250 + i * 60))
+                    self.screen.blit(option_text, option_rect)
+                # Handle pause input
+                for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
+                     if event.type == pygame.QUIT: self.running = False; break
+                     if event.type == pygame.KEYDOWN:
+                          if event.key == pygame.K_ESCAPE: self.game_state = STATE_GAME_RUNNING # Resume
+                          elif event.key == pygame.K_UP: self.selected_pause_option = (self.selected_pause_option - 1) % len(self.pause_options)
+                          elif event.key == pygame.K_DOWN: self.selected_pause_option = (self.selected_pause_option + 1) % len(self.pause_options)
+                          elif event.key == pygame.K_RETURN:
+                               if self.selected_pause_option == 0: self.game_state = STATE_GAME_RUNNING # Resume
+                               elif self.selected_pause_option == 1: # Quit to Start Menu
+                                    self.reset_game_state() # Reset to fighting game start menu
 
-            print("Exiting Fighting Game run loop.")  # Indicate loop exit
-        except Exception as e:
-            print(f"An error occurred in FightingGame: {e}")
-            self.running = False
-        finally:
-            cleanup_gpio()
-            print("Exiting program. GPIO cleanup handled.")
+            elif self.game_state == STATE_GAME_OVER_WIN or self.game_state == STATE_GAME_OVER_LOSE:
+                self.draw_game_over_screen()
+                action = self.handle_game_over_input()
+                if action == "QUIT":
+                    self.running = False
+
+            # Update the display
+            pygame.display.flip()
+
+        print("Exiting Fighting Game run loop.") # Indicate loop exit
 
     def reset_game_state(self):
         """Resets the game to the initial start menu state."""

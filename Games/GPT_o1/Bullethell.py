@@ -4,7 +4,9 @@ import sys
 import math
 import os
 import shutil
-from gpio_manager import read_gpio_input, cleanup_gpio
+from gpio_manager import read_gpio_input
+
+#test
 
 # Get the directory of the current Python file
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -356,26 +358,18 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.circle(player_image, BLACK, (15, 15), 3)   # Black hitbox
 
     def update(self):
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
-
         self.speedx = 0
         self.speedy = 0
+        gpio_states = read_gpio_input()
 
-        if gpio_states["left"]:
+        if gpio_states.get("left"):
             self.speedx = -self.base_speed
-        if gpio_states["right"]:
+        if gpio_states.get("right"):
             self.speedx = self.base_speed
-        if gpio_states["up"]:
+        if gpio_states.get("up"):
             self.speedy = -self.base_speed
-        if gpio_states["down"]:
+        if gpio_states.get("down"):
             self.speedy = self.base_speed
-
-        if gpio_states["action1"]:  # Replace key for shooting
-            self.shoot()
 
         self.rect.x += self.speedx
         self.rect.y += self.speedy
@@ -389,6 +383,10 @@ class Player(pygame.sprite.Sprite):
             self.rect.top = 0
         if self.rect.bottom > SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
+
+        # Shooting
+        if gpio_states.get("action1"):
+            self.shoot()
 
     def shoot(self):
         now = pygame.time.get_ticks()
@@ -1027,57 +1025,50 @@ def draw_hud():
         screen.blit(watermark, (SCREEN_WIDTH - watermark.get_width() - 10, 10))
         
 def start_menu(screen, font, clock):
-    try:
-        gpio_states = read_gpio_input() or {}
-    except Exception as e:
-        print(f"Error reading GPIO input: {e}")
-        gpio_states = {}
-
     options = ["Start Game", "Return to Main Menu"]
     selected = 0
+    # Use a larger neon font for the title
     title_font = pygame.font.SysFont("Arial", 72, bold=True)
-
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif gpio_states:
-                if gpio_states.get("up", False):
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
                     selected = (selected - 1) % len(options)
-                elif gpio_states.get("down", False):
+                elif event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(options)
-                elif gpio_states.get("select", False):
+                elif event.key == pygame.K_RETURN:
                     return options[selected]
-
-        # Draw menu background
+        # Draw static menu background
         draw_menu_background(screen)
-
-        # Add overlay for cyberpunk effect
+        
+        # Add a semi-transparent overlay for a cyberpunk effect
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.set_alpha(100)
         overlay.fill((10, 10, 40))
-        screen.blit(overlay, (0, 0))
-
-        # Draw title
+        screen.blit(overlay, (0,0))
+        
+        # Draw neon title
         title_text = title_font.render("BULLET HELL", True, (0, 255, 255))
         glow = title_font.render("BULLET HELL", True, (255, 20, 147))
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100))
         screen.blit(glow, (title_rect.x - 2, title_rect.y - 2))
         screen.blit(title_text, title_rect)
-
-        # Draw options
+        
+        # Draw menu options
         for i, option in enumerate(options):
             color = (0, 255, 255) if i == selected else (200, 200, 200)
             option_text = font.render(option, True, color)
             option_rect = option_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + i * 40))
             screen.blit(option_text, option_rect)
-
-        # Draw instructions
+            
+        # Draw instruction line with neon accent
         instr_text = font.render("Use UP/DOWN & ENTER", True, (255, 105, 180))
         instr_rect = instr_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
         screen.blit(instr_text, instr_rect)
-
+        
         pygame.display.flip()
         clock.tick(FPS)
 
@@ -1101,38 +1092,23 @@ class BulletHellGame:
         # (Copy existing initialization code)
 
     def handle_events(self):
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif gpio_states.get("esc", False):  # Remove keyboard handling
-                self.running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.running = False
 
     def run(self):
-        try:
-            while True:
-                menu_choice = start_menu(self.screen, font, self.clock)
-                if menu_choice == "Return to Main Menu":
-                    return  # Return control back to main.py
-                reset_game(False)  # Reset game state before a new session
-                self.running = True
-                self.game_loop()  # Run one game session
-        except Exception as e:
-            print(f"An error occurred in BulletHellGame: {e}")
-            self.running = False
+        while True:
+            menu_choice = start_menu(self.screen, font, self.clock)
+            if menu_choice == "Return to Main Menu":
+                return  # Return control back to main.py
+            reset_game(False)  # Reset game state before a new session
+            self.running = True
+            self.game_loop()  # Run one game session
             
     def game_loop(self):
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
-
         global game_over, boss_spawned, boss_active, level_complete, level, game_won
         global wave_number, wave_start_time, level_start_time
         wave_start_time = pygame.time.get_ticks()
@@ -1145,13 +1121,13 @@ class BulletHellGame:
                     self.running = False
                     pygame.quit()
                     return
-                elif gpio_states:
+                elif event.type == pygame.KEYDOWN:
                     if game_over:
-                        if gpio_states.get("action1", False):
+                        if event.key == pygame.K_m:
                             self.running = False  # Exit to start menu
-                        elif gpio_states.get("action2", False):
+                        elif event.key == pygame.K_r:
                             reset_game(False)
-                        elif gpio_states.get("action3", False):
+                        elif event.key == pygame.K_c:
                             reset_game(True)
             if not game_over:
                 # Enemy spawning logic
@@ -1313,12 +1289,6 @@ class BulletHellGame:
 
 # Main Game Loop
 def main():
-    try:
-        gpio_states = read_gpio_input() or {}
-    except Exception as e:
-        print(f"Error reading GPIO input: {e}")
-        gpio_states = {}
-
     global game_over, boss_spawned, boss_active, level_complete, level, game_won
     global wave_number, wave_start_time, level_start_time
     running = True
@@ -1330,16 +1300,16 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif (event.type == pygame.KEYDOWN or gpio_states) and game_over:
-                if gpio_states["action1"]:
+            elif event.type == pygame.KEYDOWN and game_over:
+                if event.key == pygame.K_m:
                     running = False  # Break out to return to the start menu
                 elif game_won:
-                    if gpio_states["action2"]:
+                    if event.key == pygame.K_r:
                         reset_game(False)
                 else:
-                    if gpio_states["action2"]:
+                    if event.key == pygame.K_r:
                         reset_game(False)
-                    elif gpio_states["action3"]:
+                    elif event.key == pygame.K_c:
                         reset_game(True)
         if not game_over:
             all_sprites.update()
@@ -1466,10 +1436,6 @@ def main():
     return  # Removed sys.exit() to allow proper return to the start menu
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        cleanup_gpio()
-        print("Exiting program. GPIO cleanup handled.")
+    main()
+    
+    #test 2

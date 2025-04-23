@@ -3,7 +3,9 @@ import sys
 import os
 import random
 import subprocess
-from gpio_manager import read_gpio_input, cleanup_gpio
+from gpio_manager import read_gpio_input
+
+# Removed update_game_from_github and configure_wifi functions
 
 # Get the absolute path to the Games directory
 GAMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Games')
@@ -88,97 +90,75 @@ class GameMenu:
 
     def draw_menu(self):
         self.draw_background()
-
-        # Draw title with neon effect
+        
+        # Draw title with neon effect.
         title_text = self.font.render("Game Selection", True, (0, 255, 255))
         glow = self.font.render("Game Selection", True, (255, 20, 147))
-        title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH / 2, 80))
-        self.screen.blit(glow, (title_rect.x + 2, title_rect.y + 2))
+        title_rect = title_text.get_rect(center=(self.SCREEN_WIDTH/2, 80))
+        self.screen.blit(glow, (title_rect.x+2, title_rect.y+2))
         self.screen.blit(title_text, title_rect)
-
-        # Draw options with their graphic
+        
+        # Draw options with their graphic.
         for i, option in enumerate(self.options):
             rect = pygame.Rect(0, 0, 300, 80)
-            rect.center = (self.SCREEN_WIDTH // 2, 200 + i * 100)
+            rect.center = (self.SCREEN_WIDTH//2, 200 + i * 100)
             fill_color = (50, 50, 50) if i != self.selected else (80, 80, 80)
             pygame.draw.rect(self.screen, fill_color, rect, border_radius=10)
-
             border_color = self.SELECTED_COLOR if i == self.selected else self.WHITE
             pygame.draw.rect(self.screen, border_color, rect, 3, border_radius=10)
-
+            self.draw_option_graphic(option, rect)
             text = self.small_font.render(option, True, border_color)
             text_rect = text.get_rect(center=(rect.centerx, rect.centery))
             self.screen.blit(text, text_rect)
 
-        # Draw instructions for game selection
+        # Draw instructions for game selection.
         instructions = self.small_font.render("Press UP/DOWN to select, ENTER to start", True, self.WHITE)
-        instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT - 30))
+        instr_rect = instructions.get_rect(center=(self.SCREEN_WIDTH//2, self.SCREEN_HEIGHT - 30))
         self.screen.blit(instructions, instr_rect)
-
+                
         pygame.display.flip()
 
     def handle_input(self):
-        try:
-            gpio_states = read_gpio_input() or {}
-        except Exception as e:
-            print(f"Error reading GPIO input: {e}")
-            gpio_states = {}
-
-        # Debugging: Print the gpio_states to verify input
-        print(f"GPIO States: {gpio_states}")
-
-        if gpio_states.get("up", False):
+        gpio_states = read_gpio_input()
+        if gpio_states.get("esc"):
+            self.running = False
+            return "QUIT"
+        if gpio_states.get("up"):
             self.selected = (self.selected - 1) % len(self.options)
-            print(f"Menu selection moved up: {self.selected}")
-        elif gpio_states.get("down", False):
+        elif gpio_states.get("down"):
             self.selected = (self.selected + 1) % len(self.options)
-            print(f"Menu selection moved down: {self.selected}")
-        elif gpio_states.get("select", False):
-            print(f"Menu option selected: {self.options[self.selected]}")
+        elif gpio_states.get("select"):
             return self.options[self.selected]
         return None
 
     def run(self):
-        print("GameMenu started.")
-        bullet_hell_game = BulletHellGame()
+        bullet_hell_game = BulletHellGame()  # if these work correctly
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
                 if action == "Bullet Hell":
-                    print("Launching Bullet Hell game.")
                     self.in_menu = False
                     bullet_hell_game.run()
                     self.in_menu = True
                 elif action == "Rhythm Game":
-                    print("Launching Rhythm Game.")
                     self.in_menu = False
                     rhythm_game_main()
                     self.in_menu = True
                 elif action == "Fighting Game":
-                    print("Launching Fighting Game.")
                     self.in_menu = False
+                    # Create a new instance so that internal state is fresh
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
                 elif action == "Exit" or action == "QUIT":
-                    print("Exiting GameMenu.")
                     self.running = False
                 self.clock.tick(60)
-        print("GameMenu exited.")
         pygame.quit()
 
 if __name__ == "__main__":
-    try:
-        pygame.init()
-        screen = pygame.display.set_mode((800, 480))
-        pygame.display.set_caption("Arcade Game Menu")
-        clock = pygame.time.Clock()
-        menu = GameMenu(screen, clock)
-        menu.run()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        pygame.quit()
-        cleanup_gpio()
-        print("Exiting program. GPIO cleanup handled.")
+    pygame.init()
+    screen = pygame.display.set_mode((800, 480))
+    clock = pygame.time.Clock()
+    menu = GameMenu(screen, clock)
+    menu.run()
