@@ -526,11 +526,12 @@ class FightingGame:
                 self.running = False
                 return "QUIT"  # Signal exit
             if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
-                if self.gpio_states.get("up"):
-                    self.selected_start_option = (self.selected_start_option - 1) % len(self.start_menu_options)
-                elif self.gpio_states.get("down"):
-                    self.selected_start_option = (self.selected_start_option + 1) % len(self.start_menu_options)
-                elif self.gpio_states.get("select"):
+                if any(self.gpio_states.values()):
+                    print("GPIO States Triggered:", self.gpio_states)  # Debugging: Log GPIO states when triggered
+
+                # Ensure debounce logic is applied correctly
+                if self.gpio_states.get("select"):
+                    print("Select button pressed")  # Debugging: Log select button press
                     if self.selected_start_option == 0:  # Start Game -> Go to Level Select
                         self.game_state = STATE_LEVEL_SELECT
                         self.selected_level = 1  # Reset level selection
@@ -540,6 +541,7 @@ class FightingGame:
                         self.running = False  # Stop this game's loop
                         return "QUIT"  # Signal exit from this game instance
                 elif self.gpio_states.get("esc"):  # Allow ESC to exit from this game's menu
+                    print("ESC button pressed")  # Debugging: Log ESC button press
                     self.running = False
                     return "QUIT"
         return None  # No action taken this frame
