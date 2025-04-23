@@ -358,17 +358,16 @@ class FightingGame:
         """Draws the screen displaying basic attacks and combos with scrolling."""
         draw_menu_gradient(self.screen, (30, 0, 30), (60, 0, 60))
         title_text = self.title_font.render("Attack List", True, (255, 255, 0))
-        title_rect = title_text.get_rect(center=(self.screen_width // 2, 60)) # Move title up
+        title_rect = title_text.get_rect(center=(self.screen_width // 2, 60))
         self.screen.blit(title_text, title_rect)
 
-        start_y = 120 # Start drawing items lower
+        start_y = 120
         text_color = (220, 220, 220)
-        line_height = 35 # Slightly smaller line height
-        max_visible_y = self.screen_height - 80 # Limit drawing area
+        line_height = 35
+        max_visible_y = self.screen_height - 80
 
-        # --- Combine all items into a single list for easier scrolling ---
         all_items = []
-        all_items.append(("--- Basic Moves ---", (200, 200, 255))) # Add title with color
+        all_items.append(("--- Basic Moves ---", (200, 200, 255)))
         basic_moves = {
             "ARROWS": "Move", "UP": "Jump", "DOWN": "Crouch/Block",
             "Q": "Punch", "E": "Kick", "SPACE": "Dodge"
@@ -376,21 +375,11 @@ class FightingGame:
         for key, move in basic_moves.items():
             all_items.append((f"{key}: {move}", text_color))
 
-        all_items.append(("", text_color)) # Spacer
-        all_items.append(("--- Combo Moves ---", (200, 200, 255))) # Add title with color
+        all_items.append(("", text_color))
+        all_items.append(("--- Combo Moves ---", (200, 200, 255)))
 
         dir_symbols = {'up': '↑', 'down': '↓', 'left': '←', 'right': '→'}
-        # Use the actual combo_moves from a character instance if possible, else default
-        combos_to_display = {}
-        if self.player:
-            combos_to_display = self.player.combo_moves
-        else: # Fallback if player doesn't exist yet (e.g., called from menu)
-             combos_to_display = {
-                 (('down', 'right'), 'punch'): {"name": "Fireball"},
-                 (('left', 'down', 'right'), 'punch'): {"name": "Throw"},
-                 (('down', 'right'), 'kick'): {"name": "SpinKick"}
-             }
-
+        combos_to_display = self.player.combo_moves if self.player else {}
         for (directions, attack_trigger), move_info in combos_to_display.items():
             dir_string = " ".join(dir_symbols.get(d, d) for d in directions)
             trigger_key = "Q" if attack_trigger == "punch" else "E" if attack_trigger == "kick" else attack_trigger.upper()
@@ -398,42 +387,33 @@ class FightingGame:
             all_items.append((combo_text_str, text_color))
 
         self.attack_list_total_items = len(all_items)
-
-        # --- Determine visible range ---
         start_index = self.attack_list_scroll_offset
         end_index = min(self.attack_list_total_items, start_index + self.attack_list_visible_items)
 
-        # --- Draw visible items ---
         current_y = start_y
         for i in range(start_index, end_index):
             item_text, item_color = all_items[i]
-            if not item_text: # Skip empty spacers
+            if not item_text:
                 current_y += line_height // 2
                 continue
 
             text_surface = self.font.render(item_text, True, item_color)
             text_rect = text_surface.get_rect(center=(self.screen_width // 2, current_y))
 
-            # Only blit if within visible area vertically
             if text_rect.bottom < max_visible_y:
                 self.screen.blit(text_surface, text_rect)
             current_y += line_height
 
-        # --- Draw Scroll Indicators (Optional) ---
         if self.attack_list_total_items > self.attack_list_visible_items:
-            # Up arrow if not at top
             if self.attack_list_scroll_offset > 0:
                 up_arrow = self.font.render("↑", True, (150, 150, 255))
                 up_rect = up_arrow.get_rect(center=(self.screen_width - 40, start_y))
                 self.screen.blit(up_arrow, up_rect)
-            # Down arrow if not at bottom
             if self.attack_list_scroll_offset < self.attack_list_total_items - self.attack_list_visible_items:
                 down_arrow = self.font.render("↓", True, (150, 150, 255))
                 down_rect = down_arrow.get_rect(center=(self.screen_width - 40, max_visible_y - line_height // 2))
                 self.screen.blit(down_arrow, down_rect)
 
-
-        # --- Footer ---
         back_text = self.font.render("Press ESC to return", True, (200, 200, 200))
         back_rect = back_text.get_rect(center=(self.screen_width // 2, self.screen_height - 40))
         self.screen.blit(back_text, back_rect)
@@ -622,59 +602,40 @@ class FightingGame:
 
     def handle_input(self):
         """Handles player input during the game running state."""
-        self.update_gpio_states()  # Update GPIO states dynamically
+        self.gpio_states = read_gpio_input()  # Directly read GPIO states without debouncing
         performed_attack_type = None
 
-        # --- Single Event Loop (Handles KEYDOWN for buffer) ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 return "QUIT"
 
-            #if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
-            if self.gpio_states.get("esc"):
-                self.game_state = STATE_PAUSED
-                self.selected_pause_option = 0
-                return None
+            if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
+                if self.gpio_states.get("esc"):
+                    self.game_state = STATE_PAUSED
+                    self.selected_pause_option = 0
+                    return None
 
-            # Actions triggered on key press
-            if self.player:
-                # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                if self.gpio_states.get("up"):
-                    self.player._add_direction_to_buffer('up')
-                    self.player.jump()  # Still trigger jump action
-                elif self.gpio_states.get("down"):
-                    self.player._add_direction_to_buffer('down')
-                    self.player.crouch()  # Still trigger crouch action
-                elif self.gpio_states.get("left"):
-                    self.player._add_direction_to_buffer('left')
-                    # Movement itself is handled by get_pressed below
-                elif self.gpio_states.get("right"):
-                    self.player._add_direction_to_buffer('right')
-                    # Movement itself is handled by get_pressed below
-                # --- End Buffer Input ---
-
-                # Attack / Dodge Inputs
-                elif self.gpio_states.get("action1"):  # Punch
-                    performed_attack_type = self.player.attack("punch")
-                elif self.gpio_states.get("action2"):  # Kick
-                    performed_attack_type = self.player.attack("kick")
-                elif self.gpio_states.get("action3"):
-                    self.player.dodge()  # Dodge action
+                if self.player:
+                    if self.gpio_states.get("up"):
+                        self.player.jump()
+                    elif self.gpio_states.get("down"):
+                        self.player.crouch()
+                    elif self.gpio_states.get("left"):
+                        self.player.move_left()
+                    elif self.gpio_states.get("right"):
+                        self.player.move_right()
+                    elif self.gpio_states.get("action1"):
+                        performed_attack_type = self.player.attack("punch")
+                    elif self.gpio_states.get("action2"):
+                        performed_attack_type = self.player.attack("kick")
+                    elif self.gpio_states.get("action3"):
+                        self.player.dodge()
 
             if event.type == pygame.KEYUP:
-                # Stop crouching when DOWN key is released
                 if self.player and self.gpio_states.get("down"):
                     self.player.stand()
 
-        # --- Continuous Movement (outside event loop, uses get_pressed) ---
-        if self.player and self.game_state == STATE_GAME_RUNNING:
-            if self.gpio_states.get("left"):
-                self.player.move_left()  # Call movement method
-            if self.gpio_states.get("right"):
-                self.player.move_right()  # Call movement method
-
-        # --- Process Attack (if any was performed) ---
         if performed_attack_type and self.opponent:
             self.handle_attack(self.player, self.opponent, performed_attack_type)
 
