@@ -4,6 +4,29 @@ import random
 import numpy as np
 import json
 import math
+import RPi.GPIO as GPIO
+
+# GPIO Pin Definitions
+GPIO_PINS = {
+    "down": 2,
+    "left": 3,
+    "up": 4,
+    "right": 5,
+    "esc": 6,
+    "select": 7,
+    "action1": 8,
+    "action2": 9,
+    "action3": 10,
+}
+
+# GPIO Setup
+GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+for pin in GPIO_PINS.values():
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
+
+def read_gpio_input():
+    """Reads GPIO input states and returns a dictionary of button states."""
+    return {key: not GPIO.input(pin) for key, pin in GPIO_PINS.items()}  # `not` inverts because pull-up is used
 
 running = True
 
@@ -523,22 +546,23 @@ def render(screen, game_state, notes, score_tracker, menu_font):
 
 def handle_menu_input(event, game_state):
     """Handle menu navigation input"""
-    if event.key == pygame.K_UP:
+    gpio_states = read_gpio_input()
+    if gpio_states["up"]:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty - 1) % len(game_state.difficulties)
         # No change for menu item 2 (speed) or 3 (exit)
-    elif event.key == pygame.K_DOWN:
+    elif gpio_states["down"]:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index + 1) % len(SONGS)
         elif game_state.selected_menu_item == 1:
             game_state.selected_difficulty = (game_state.selected_difficulty + 1) % len(game_state.difficulties)
-    elif event.key == pygame.K_LEFT and game_state.selected_menu_item == 2:
+    elif gpio_states["left"] and game_state.selected_menu_item == 2:
         game_state.scroll_speed = max(MIN_SCROLL_SPEED, game_state.scroll_speed - 1)
-    elif event.key == pygame.K_RIGHT and game_state.selected_menu_item == 2:
+    elif gpio_states["right"] and game_state.selected_menu_item == 2:
         game_state.scroll_speed = min(MAX_SCROLL_SPEED, game_state.scroll_speed + 1)
-    elif event.key == pygame.K_TAB:
+    elif gpio_states["esc"]:
         game_state.selected_menu_item = (game_state.selected_menu_item + 1) % 4  # Now 4 items (0,1,2,3)
 
 def calculate_music_delay(scroll_speed):
@@ -564,6 +588,7 @@ def start_song(game_state):
     game_state.current_state = STATE_PLAY
 
 def main():
+    gpio_states = read_gpio_input()
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("4K Rhythm Game")
@@ -581,9 +606,9 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
                 
-            elif event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN or gpio_states:
                 if game_state.current_state == STATE_MENU:
-                    if event.key == pygame.K_RETURN:
+                    if gpio_states["select"]:
                         if game_state.selected_menu_item == 3:
                             # Selected "Return to Main Menu"
                             return  # Exit main() so control goes back to main.py
@@ -597,7 +622,7 @@ def main():
                         handle_menu_input(event, game_state)
                 
                 elif game_state.current_state == STATE_PLAY:
-                    if event.key == pygame.K_ESCAPE:
+                    if gpio_states["esc"]:
                         game_state.current_state = STATE_PAUSE
                         game_state.music_position = pygame.time.get_ticks() - game_state.game_start_time
                         game_state.music.stop()
@@ -605,11 +630,11 @@ def main():
                         handle_note_hit(event.key, game_state, game_state.notes, game_state.score_tracker)
                 
                 elif game_state.current_state == STATE_PAUSE:
-                    if event.key == pygame.K_UP:
+                    if gpio_states["up"]:
                         game_state.selected_pause_option = (game_state.selected_pause_option - 1) % len(game_state.pause_options)
-                    elif event.key == pygame.K_DOWN:
+                    elif gpio_states["down"]:
                         game_state.selected_pause_option = (game_state.selected_pause_option + 1) % len(game_state.pause_options)
-                    elif event.key == pygame.K_RETURN:
+                    elif gpio_states["select"]:
                         if game_state.selected_pause_option == 0:  # Restart
                             start_song(game_state)
                         elif game_state.selected_pause_option == 1:  # Exit to Menu
@@ -651,8 +676,8 @@ def main():
                 game_state.song_finished = True
         
         elif game_state.current_state == STATE_RESULTS:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
+            if event.type == pygame.KEYDOWN or gpio_states:
+                if gpio_states["select"]:
                     # Always return to menu
                     game_state.current_state = STATE_MENU
                     game_state.song_finished = False
