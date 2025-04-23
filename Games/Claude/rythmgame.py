@@ -950,4 +950,7 @@ def create_background():
     return background
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        GPIO.cleanup()

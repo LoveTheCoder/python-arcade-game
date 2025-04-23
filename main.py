@@ -180,8 +180,11 @@ class GameMenu:
         pygame.quit()
 
 if __name__ == "__main__":
-    pygame.init()
-    screen = pygame.display.set_mode((800, 480))
-    clock = pygame.time.Clock()
-    menu = GameMenu(screen, clock)
-    menu.run()
+    try:
+        pygame.init()
+        screen = pygame.display.set_mode((800, 480))
+        clock = pygame.time.Clock()
+        menu = GameMenu(screen, clock)
+        menu.run()
+    finally:
+        GPIO.cleanup()  # Clean up GPIO pins on exit

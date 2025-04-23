@@ -1461,6 +1461,9 @@ def main():
     return  # Removed sys.exit() to allow proper return to the start menu
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        GPIO.cleanup()
     
     #test 2
