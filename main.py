@@ -120,16 +120,16 @@ class GameMenu:
     def handle_input(self):
         gpio_states = read_gpio_input() or {}
 
-        if gpio_states.get("up", False):
+        if gpio_states.get("up", True):
             self.selected = (self.selected - 1) % len(self.options)
             print(f"Menu selection moved up: {self.selected}")
-        elif gpio_states.get("down", False):
+        elif gpio_states.get("down", True):
             self.selected = (self.selected + 1) % len(self.options)
             print(f"Menu selection moved down: {self.selected}")
-        elif gpio_states.get("select", False):
+        elif gpio_states.get("select", True):
             print(f"Menu option selected: {self.options[self.selected]}")
             return self.options[self.selected]
-        elif gpio_states.get("esc", False):
+        elif gpio_states.get("esc", True):
             print("Escape pressed. Exiting menu.")
             self.running = False
             return "QUIT"
