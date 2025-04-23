@@ -3,33 +3,29 @@ import sys
 import os
 import random
 import subprocess
-import RPi.GPIO as GPIO
+from gpiozero import Button
 
 # GPIO Pin Definitions
 GPIO_PINS = {
-    "down": 2,
-    "left": 3,
-    "up": 4,
-    "right": 5,
-    "esc": 6,
-    "select": 7,
-    "action1": 8,
-    "action2": 9,
-    "action3": 10,
+    "down": Button(2, pull_up=True),
+    "left": Button(3, pull_up=True),
+    "up": Button(4, pull_up=True),
+    "right": Button(5, pull_up=True),
+    "esc": Button(6, pull_up=True),
+    "select": Button(7, pull_up=True),
+    "action1": Button(8, pull_up=True),
+    "action2": Button(9, pull_up=True),
+    "action3": Button(10, pull_up=True),
 }
 
 # GPIO Setup
-GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-for pin in GPIO_PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
+#GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+#for pin in GPIO_PINS.values():
+#    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
 
 def read_gpio_input():
     """Reads GPIO input states and returns a dictionary of button states."""
-    try:
-        return {key: not GPIO.input(pin) for key, pin in GPIO_PINS.items()}  # `not` inverts because pull-up is used
-    except RuntimeError as e:
-        print(f"GPIO read error: {e}")
-        return {key: False for key in GPIO_PINS.keys()}  # Default to all buttons unpressed
+    return {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
 # Removed update_game_from_github and configure_wifi functions
 
 # Get the absolute path to the Games directory
@@ -190,4 +186,4 @@ if __name__ == "__main__":
         menu = GameMenu(screen, clock)
         menu.run()
     finally:
-        GPIO.cleanup()  # Clean up GPIO pins on exit
+        print("Exiting program. GPIO cleanup handled by gpiozero.")
