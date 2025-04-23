@@ -1085,10 +1085,13 @@ class BulletHellGame:
         gpio_states = read_gpio_input()
         if gpio_states.get("esc"):
             self.running = False
+        elif game_over:
+            if gpio_states.get("action1"):
+                reset_game(False)
+            elif gpio_states.get("action2"):
+                reset_game(True)
         elif gpio_states.get("action1"):
-            reset_game(False)
-        elif gpio_states.get("action2"):
-            reset_game(True)
+            player.shoot()
 
     def run(self):
         while True:
