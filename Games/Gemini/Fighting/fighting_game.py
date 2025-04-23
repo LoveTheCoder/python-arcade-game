@@ -500,7 +500,7 @@ class FightingGame:
 
     def handle_input(self):
         """Handles player input during the game running state."""
-        self.update_gpio_states()  # Ensure GPIO states are updated dynamically
+        self.gpio_states = read_gpio_input()  # Directly read GPIO states without debouncing
         performed_attack_type = None
 
         keys = pygame.key.get_pressed()  # For continuous movement
@@ -512,8 +512,8 @@ class FightingGame:
 
             if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
                 if self.gpio_states.get("esc"):
-                    self.game_state = STATE_PAUSED  # Set game state to paused
-                    self.selected_pause_option = 0  # Reset pause menu selection
+                    self.game_state = STATE_PAUSED
+                    self.selected_pause_option = 0
                     return None
 
                 if self.player:
@@ -542,6 +542,8 @@ class FightingGame:
                 self.player.move_right()
             if self.gpio_states.get("up") or keys[pygame.K_UP]:
                 self.player.jump()
+            #if self.gpio_states.get("down") or keys[pygame.K_DOWN]:
+            #    self.player.crouch()
 
         return None
 
