@@ -122,37 +122,47 @@ class GameMenu:
 
         if gpio_states.get("up", False):
             self.selected = (self.selected - 1) % len(self.options)
+            print(f"Menu selection moved up: {self.selected}")
         elif gpio_states.get("down", False):
             self.selected = (self.selected + 1) % len(self.options)
+            print(f"Menu selection moved down: {self.selected}")
         elif gpio_states.get("select", False):
+            print(f"Menu option selected: {self.options[self.selected]}")
             return self.options[self.selected]
         elif gpio_states.get("esc", False):
+            print("Escape pressed. Exiting menu.")
             self.running = False
             return "QUIT"
         return None
 
     def run(self):
+        print("GameMenu started.")
         bullet_hell_game = BulletHellGame()
         while self.running:
             if self.in_menu:
                 self.draw_menu()
                 action = self.handle_input()
                 if action == "Bullet Hell":
+                    print("Launching Bullet Hell game.")
                     self.in_menu = False
                     bullet_hell_game.run()
                     self.in_menu = True
                 elif action == "Rhythm Game":
+                    print("Launching Rhythm Game.")
                     self.in_menu = False
                     rhythm_game_main()
                     self.in_menu = True
                 elif action == "Fighting Game":
+                    print("Launching Fighting Game.")
                     self.in_menu = False
                     fighting_game = FightingGame(self.screen, self.clock)
                     fighting_game.run()
                     self.in_menu = True
                 elif action == "Exit" or action == "QUIT":
+                    print("Exiting GameMenu.")
                     self.running = False
                 self.clock.tick(60)
+        print("GameMenu exited.")
         pygame.quit()
 
 if __name__ == "__main__":
@@ -167,5 +177,5 @@ if __name__ == "__main__":
         print(f"An error occurred: {e}")
     finally:
         pygame.quit()
-        cleanup_gpio()  # Ensure GPIO cleanup is always called
+        cleanup_gpio()
         print("Exiting program. GPIO cleanup handled.")
