@@ -379,7 +379,7 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.circle(player_image, BLACK, (15, 15), 3)   # Black hitbox
 
     def update(self):
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
 
         self.speedx = 0
         self.speedy = 0
@@ -1046,7 +1046,7 @@ def draw_hud():
         screen.blit(watermark, (SCREEN_WIDTH - watermark.get_width() - 10, 10))
         
 def start_menu(screen, font, clock):
-    gpio_states = read_gpio_input()
+    gpio_states = read_gpio_input() or {}
     options = ["Start Game", "Return to Main Menu"]
     selected = 0
     # Use a larger neon font for the title
@@ -1114,7 +1114,7 @@ class BulletHellGame:
         # (Copy existing initialization code)
 
     def handle_events(self):
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -1132,7 +1132,7 @@ class BulletHellGame:
             self.game_loop()  # Run one game session
             
     def game_loop(self):
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
         global game_over, boss_spawned, boss_active, level_complete, level, game_won
         global wave_number, wave_start_time, level_start_time
         wave_start_time = pygame.time.get_ticks()
@@ -1313,7 +1313,7 @@ class BulletHellGame:
 
 # Main Game Loop
 def main():
-    gpio_states = read_gpio_input()
+    gpio_states = read_gpio_input() or {}
     global game_over, boss_spawned, boss_active, level_complete, level, game_won
     global wave_number, wave_start_time, level_start_time
     running = True

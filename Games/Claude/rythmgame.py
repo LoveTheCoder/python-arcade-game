@@ -546,7 +546,7 @@ def render(screen, game_state, notes, score_tracker, menu_font):
 
 def handle_menu_input(event, game_state):
     """Handle menu navigation input"""
-    gpio_states = read_gpio_input()
+    gpio_states = read_gpio_input() or {}
     if gpio_states["up"]:
         if game_state.selected_menu_item == 0:
             game_state.selected_song_index = (game_state.selected_song_index - 1) % len(SONGS)
@@ -588,7 +588,7 @@ def start_song(game_state):
     game_state.current_state = STATE_PLAY
 
 def main():
-    gpio_states = read_gpio_input()
+    gpio_states = read_gpio_input() or {}
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("4K Rhythm Game")

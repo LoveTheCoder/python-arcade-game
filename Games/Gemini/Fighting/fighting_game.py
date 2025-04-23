@@ -531,7 +531,7 @@ class FightingGame:
 
     def handle_start_input(self):
         """Handles input for the main start menu of the fighting game."""
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -557,7 +557,7 @@ class FightingGame:
 
     def handle_level_select_input(self):
         """Handles input for level selection, including Practice."""
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
         total_options = self.max_levels + 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -582,7 +582,7 @@ class FightingGame:
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -597,7 +597,7 @@ class FightingGame:
     def handle_input(self):
         """Handles player input during the game running state."""
         performed_attack_type = None
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
 
         # --- Single Event Loop (Handles KEYDOWN for buffer) ---
         for event in pygame.event.get():
@@ -788,7 +788,7 @@ class FightingGame:
 
             elif self.game_state == STATE_ATTACK_LIST:
                 self.draw_attack_list()
-                gpio_states = read_gpio_input()
+                gpio_states = read_gpio_input() or {}
                 # Handle input for attack list screen (including scrolling)
                 for event in pygame.event.get([pygame.QUIT, pygame.KEYDOWN]):
                     if event.type == pygame.QUIT:

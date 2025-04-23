@@ -19,14 +19,17 @@ GPIO_PINS = {
 }
 
 # GPIO Setup
-#GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
-#for pin in GPIO_PINS.values():
-#    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
+GPIO.setmode(GPIO.BCM)  # Use Broadcom pin numbering
+for pin in GPIO_PINS.values():
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # Set pins as input with pull-up resistors
 
 def read_gpio_input():
     """Reads GPIO input states and returns a dictionary of button states."""
-    #return {key: not GPIO.input(pin) for key, pin in GPIO_PINS.items()}  # `not` inverts because pull-up is used
-
+    try:
+        return {key: not GPIO.input(pin) for key, pin in GPIO_PINS.items()}  # `not` inverts because pull-up is used
+    except RuntimeError as e:
+        print(f"GPIO read error: {e}")
+        return {key: False for key in GPIO_PINS.keys()}  # Default to all buttons unpressed
 # Removed update_game_from_github and configure_wifi functions
 
 # Get the absolute path to the Games directory
@@ -141,7 +144,7 @@ class GameMenu:
         pygame.display.flip()
 
     def handle_input(self):
-        gpio_states = read_gpio_input()
+        gpio_states = read_gpio_input() or {}
 
         if gpio_states["up"]:
             self.selected = (self.selected - 1) % len(self.options)
