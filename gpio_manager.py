@@ -17,7 +17,7 @@ GPIO_PINS = {
 def read_gpio_input():
     """Reads GPIO input states with improved debounce logic and returns a dictionary of button states."""
     initial_states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
-    sleep(0.05)  # Debounce delay (50ms)
+    sleep(0.02)  # Reduced debounce delay to 20ms for faster response
     final_states = {key: pin.is_pressed for key, pin in GPIO_PINS.items()}
 
     # Only return states that remained consistent during the debounce period
