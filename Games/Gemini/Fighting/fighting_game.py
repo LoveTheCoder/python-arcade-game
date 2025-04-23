@@ -524,6 +524,16 @@ class FightingGame:
                     elif self.gpio_states.get("action3") or keys[pygame.K_SPACE]:
                         self.player.dodge()
 
+        if self.gpio_states.get("action1") or keys[pygame.K_q]:
+            performed_attack_type = self.player.attack("punch")
+        elif self.gpio_states.get("action2") or keys[pygame.K_e]:
+            performed_attack_type = self.player.attack("kick")
+        elif self.gpio_states.get("action3") or keys[pygame.K_SPACE]:
+            self.player.dodge()
+
+        if performed_attack_type and self.opponent:
+            self.handle_attack(self.player, self.opponent, performed_attack_type)
+
         # Continuous movement handling
         if self.player:
             if self.gpio_states.get("left") or keys[pygame.K_LEFT]:
@@ -534,9 +544,6 @@ class FightingGame:
                 self.player.jump()
             #if self.gpio_states.get("down") or keys[pygame.K_DOWN]:
             #    self.player.crouch()
-
-        if performed_attack_type and self.opponent:
-            self.handle_attack(self.player, self.opponent, performed_attack_type)
 
         return None
 
@@ -658,15 +665,11 @@ class FightingGame:
 
     def handle_game_over_input(self):
         """Handles input on the game over screen."""
-        for event in pygame.event.get():
-            self.update_gpio_states()  # Update GPIO states dynamically
-            if event.type == pygame.QUIT:
-                self.running = False
-                return "QUIT"
-            if self.gpio_states.get("select"):
-                self.reset_game_state()  # Go back to the main menu
-            elif self.gpio_states.get("esc"):  # Also allow ESC to go back
-                self.reset_game_state()
+        self.update_gpio_states()  # Update GPIO states dynamically
+        if self.gpio_states.get("select"):
+            self.reset_game_state()  # Return to the start menu
+        elif self.gpio_states.get("esc"):  # Also allow ESC to go back
+            self.reset_game_state()
         return None
 
     def handle_attack(self, attacker, defender, attack_name):
