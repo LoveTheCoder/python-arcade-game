@@ -570,13 +570,13 @@ class FightingGame:
         total_options = self.max_levels + 1
 
         # Handle GPIO-based navigation
-        if self.gpio_states.get("up"):
+        if self.gpio_states.get("left"):
             self.selected_level = (self.selected_level - 1) % total_options
-        elif self.gpio_states.get("down"):
-            self.selected_level = (self.selected_level + 1) % total_options
-        elif self.gpio_states.get("left"):
-            self.selected_level = max(0, self.selected_level - 1)
         elif self.gpio_states.get("right"):
+            self.selected_level = (self.selected_level + 1) % total_options
+        elif self.gpio_states.get("up"):
+            self.selected_level = max(0, self.selected_level - 1)
+        elif self.gpio_states.get("down"):
             self.selected_level = min(total_options - 1, self.selected_level + 1)
         elif self.gpio_states.get("select"):
             self.initialize_game_session(self.selected_level)  # Ensure game session starts
@@ -632,36 +632,36 @@ class FightingGame:
                 self.running = False
                 return "QUIT"
 
-            if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
-                if self.gpio_states.get("esc"):
-                    self.game_state = STATE_PAUSED
-                    self.selected_pause_option = 0
-                    return None
+            #if event.type == pygame.KEYDOWN or any(self.gpio_states.values()):
+            if self.gpio_states.get("esc"):
+                self.game_state = STATE_PAUSED
+                self.selected_pause_option = 0
+                return None
 
-                # Actions triggered on key press
-                if self.player:
-                    # --- Add Directional Inputs to Buffer on KEYDOWN ---
-                    if self.gpio_states.get("up"):
-                        self.player._add_direction_to_buffer('up')
-                        self.player.jump()  # Still trigger jump action
-                    elif self.gpio_states.get("down"):
-                        self.player._add_direction_to_buffer('down')
-                        self.player.crouch()  # Still trigger crouch action
-                    elif self.gpio_states.get("left"):
-                        self.player._add_direction_to_buffer('left')
-                        # Movement itself is handled by get_pressed below
-                    elif self.gpio_states.get("right"):
-                        self.player._add_direction_to_buffer('right')
-                        # Movement itself is handled by get_pressed below
-                    # --- End Buffer Input ---
+            # Actions triggered on key press
+            if self.player:
+                # --- Add Directional Inputs to Buffer on KEYDOWN ---
+                if self.gpio_states.get("up"):
+                    self.player._add_direction_to_buffer('up')
+                    self.player.jump()  # Still trigger jump action
+                elif self.gpio_states.get("down"):
+                    self.player._add_direction_to_buffer('down')
+                    self.player.crouch()  # Still trigger crouch action
+                elif self.gpio_states.get("left"):
+                    self.player._add_direction_to_buffer('left')
+                    # Movement itself is handled by get_pressed below
+                elif self.gpio_states.get("right"):
+                    self.player._add_direction_to_buffer('right')
+                    # Movement itself is handled by get_pressed below
+                # --- End Buffer Input ---
 
-                    # Attack / Dodge Inputs
-                    elif self.gpio_states.get("action1"):  # Punch
-                        performed_attack_type = self.player.attack("punch")
-                    elif self.gpio_states.get("action2"):  # Kick
-                        performed_attack_type = self.player.attack("kick")
-                    elif self.gpio_states.get("action3"):
-                        self.player.dodge()  # Dodge action
+                # Attack / Dodge Inputs
+                elif self.gpio_states.get("action1"):  # Punch
+                    performed_attack_type = self.player.attack("punch")
+                elif self.gpio_states.get("action2"):  # Kick
+                    performed_attack_type = self.player.attack("kick")
+                elif self.gpio_states.get("action3"):
+                    self.player.dodge()  # Dodge action
 
             if event.type == pygame.KEYUP:
                 # Stop crouching when DOWN key is released
