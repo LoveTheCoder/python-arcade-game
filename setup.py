@@ -1,6 +1,16 @@
 import os
 import subprocess
 
+def install_required_libraries():
+    """Installs required Python libraries using apt."""
+    required_libraries = ["python3-pygame", "python3-numpy"]  # Add other required libraries here
+    try:
+        for library in required_libraries:
+            subprocess.run(["sudo", "apt-get", "install", "-y", library], check=True)
+        print("Alla nödvändiga bibliotek har installerats via apt.")
+    except Exception as e:
+        print(f"Ett fel uppstod vid installationen av bibliotek via apt: {e}")
+
 def create_systemd_service():
     service_content = """[Unit]
 Description=Launch games on startup
@@ -72,5 +82,6 @@ fi
         print(f"Ett fel uppstod vid skapandet av launch-scriptet: {e}")
 
 if __name__ == "__main__":
+    install_required_libraries()
     create_systemd_service()
     create_launch_script()
